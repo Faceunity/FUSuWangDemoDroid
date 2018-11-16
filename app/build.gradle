@@ -1,0 +1,115 @@
+apply plugin: 'com.android.application'
+
+android {
+    compileSdkVersion 25
+    buildToolsVersion "27.0.3"
+
+    defaultConfig {
+        applicationId "com.chinanetcenter.streampusherdemo"
+        minSdkVersion 18
+        targetSdkVersion 25
+        versionCode 20180202
+        versionName "1.8.7"
+        compileOptions {
+            sourceCompatibility JavaVersion.VERSION_1_7
+            targetCompatibility JavaVersion.VERSION_1_7
+        }
+    }
+
+    sourceSets.main {
+        jniLibs.srcDir 'src/main/jniLibs' // <-- 你的.so库的实际路径
+    }
+
+    lintOptions {
+        //abortOnError false
+        tasks.lint.enabled = false
+    }
+
+    signingConfigs {
+        debug {
+            keyAlias 'androiddebugkey'
+            keyPassword 'android'
+            storeFile file('debug.keystore')
+            storePassword 'android'
+        }
+    }
+
+    buildTypes {
+//        release {
+//            minifyEnabled false
+//        proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.txt'
+//        }
+        debug {
+            //minifyEnabled true
+            //zipAlignEnabled true
+            //shrinkResources true
+            //proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            signingConfig signingConfigs.debug
+            applicationVariants.all { variant ->
+                variant.outputs.each { output ->
+                    println outputFile.name
+                    def outputFile = output.outputFile
+                    if (outputFile != null && outputFile.name.endsWith('.apk')) {
+                        // 输出apk名称为StreamPusherDemo_ V1.8.4.20170527.apk
+                        def fileName = "StreamPusherDemo_${output.name}_V${variant.versionName}.apk"
+                        output.outputFile = new File(outputFile.parent, fileName)
+                    }
+                }
+            }
+        }
+
+        release {
+            signingConfig signingConfigs.debug
+
+        }
+    }
+
+    productFlavors {
+        normal{
+            versionName "1.8.7.${releaseTime()}"
+        }
+
+//        sense{
+//            versionName "1.8.7.${releaseTime()}"
+//            minSdkVersion 17
+//        }
+//        faceu{
+//            versionName "1.8.7.${releaseTime()}"
+//        }
+    }
+
+}
+
+def releaseTime() {
+    return new Date().format("yyyyMMdd", TimeZone.getTimeZone("UTC"))
+}
+
+
+dependencies {
+    //compile files('libs/android-support-v4.jar')
+    compile files('libs/auth_sdk_v1.0.2.jar')
+    compile 'com.android.support:support-v4:25.0.0'
+    compile 'com.android.support:appcompat-v7:25.0.0'
+    compile 'com.android.support:recyclerview-v7:25.0.0'
+    compile 'com.github.bumptech.glide:glide:3.7.0'
+    compile files('libs/StreamPusher.jar')
+    //    compile project(':sdk')
+    //    senseCompile files('src/sense/libs/st_mobile.jar')
+    //    senseCompile project(':STMobileJNI')
+    //    faceuCompile files('src/faceu/libs/nama.jar')
+    //    faceuCompile 'org.adw.library:discrete-seekbar:1.0.1'
+    compile project(':faceunity')
+}
+
+//编译APK
+// gradlew OutputSDK
+task OutputAPK(type: Copy) {
+    println "Hello ,I am OutputAPK!"
+    OutputAPK.dependsOn(build)
+    //推流SDK
+    from('build/outputs/apk/') {
+        into('/')
+        include('**')
+    }
+    into('../../Apk/')
+}

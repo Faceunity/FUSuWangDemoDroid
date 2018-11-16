@@ -1,0 +1,95 @@
+// Top-level build file where you can add configuration options common to all sub-projects/modules.
+buildscript {
+    repositories {
+        jcenter()
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:2.3.2'
+    }
+}
+
+allprojects {
+    repositories {
+        jcenter()
+    }
+}
+
+task OutputDemo(type: Copy) {
+    println "Hello ,I am OutputDemo!"
+    //app
+    from('app/') {
+        into('app')
+        include('**')
+        exclude('src/faceu/**/authpack.java')
+    }
+    //gradle
+    from('gradle') {
+        into('gradle')
+        include('**')
+    }
+    //配置信息
+    from('/') {
+        into('/')
+        include('build.gradle',
+                'gradle.properties',
+                'gradlew',
+                'gradlew.bat',
+                'progurad-rules.pro',
+                'settings.gradle')
+    }
+
+    doLast{
+        println "Hello ,I am OutputDemo, doLast!"
+        String content = "include ':app'";
+        File file = new File("../Demo/settings.gradle");
+        //if file doesnt exists, then create it
+        if(!file.exists()){
+            file.createNewFile();
+        }
+        try{
+            FileWriter fw = new FileWriter(file.getAbsoluteFile());
+            BufferedWriter bw = new BufferedWriter(fw);
+            bw.write(content);
+            bw.close();
+        }catch(Exception e){
+        }
+    }
+    into('../Demo')
+}
+
+
+task OutputLibs(type: Copy) {
+    println "Hello ,I am OutputLibs!"
+    //.jar包
+    from('app/libs') {
+        into('/')
+        include('**')
+    }
+    //.so推流动态库
+    from('app/src/normal/jniLibs') {
+        into('/normal')
+        include('**')
+    }
+    //.so商汤动态库
+    from('app/src/sense/jniLibs') {
+        into('/sense')
+        include('**')
+    }
+    //.so商汤动态库
+    from('STMobileJNI/src/main/libs') {
+        into('/sense')
+        include('**')
+    }
+    //.sofaceu动态库
+    from('app/src/faceu/jniLibs') {
+        into('/faceu')
+        include('**')
+    }
+    //.sofaceu jar包
+    from('app/src/faceu/libs') {
+        into('/faceu')
+        include('**')
+    }
+    into('../Libs/')
+}
+

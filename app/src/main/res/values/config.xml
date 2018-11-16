@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+	<bool name="demo_debug">true</bool>
+	<string name="rtmp_url"></string>
+	<string name="appId"></string>
+	<string name="authKey"></string>
+</resources>

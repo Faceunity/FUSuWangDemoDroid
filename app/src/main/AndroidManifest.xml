@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    package="com.chinanetcenter.streampusherdemo"
+    android:installLocation="auto">
+
+    <uses-sdk
+        android:minSdkVersion="14"
+        android:targetSdkVersion="23" />
+
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.BLUETOOTH" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/><!--魅蓝U20 弹Toast权限-->
+
+    <uses-feature android:name="android.hardware.camera" />
+
+    <application
+        android:name="MyApp"
+        android:allowBackup="true"
+        android:icon="@drawable/ic_launcher"
+        android:label="@string/app_name"
+        android:theme="@style/Theme.AppCompat.Light"
+        tools:replace="android:theme">
+        <!--把app支持的最大长宽比设置为 2.1 或者更高-->
+        <meta-data
+            android:name="android.max_aspect"
+            android:value="2.1" />
+        <activity
+            android:name="com.chinanetcenter.streampusherdemo.activity.ConfigActivity"
+            android:label="@string/app_name"
+            android:screenOrientation="portrait"
+            android:windowSoftInputMode="stateHidden" >
+           <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+        <activity
+            android:name="com.chinanetcenter.streampusherdemo.activity.MainActivity"
+            android:configChanges="keyboardHidden|orientation|screenSize|mcc|mnc"
+            android:screenOrientation="fullSensor"
+            android:launchMode="singleTop"
+            android:theme="@style/Theme.AppCompat.Light.NoActionBar" >
+        </activity>
+        <activity
+            android:name="com.chinanetcenter.streampusherdemo.activity.LoginActivity"
+            android:screenOrientation="portrait"
+            android:theme="@android:style/Theme.Holo.Light.NoActionBar" >
+
+        </activity>
+        <activity
+			android:name="com.chinanetcenter.StreamPusher.sdk.SPScreenShot$SPScreenCaptureActivity"
+			android:theme="@android:style/Theme.Translucent" />
+    </application>
+
+</manifest>

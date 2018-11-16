@@ -1,0 +1,117 @@
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:custom="http://schemas.android.com/apk/res-auto"
+    android:layout_width="fill_parent"
+    android:layout_height="fill_parent"
+    android:fitsSystemWindows="true"
+    android:layout_gravity="center_vertical"
+    android:background="#FFF0F0F0" >
+
+    <ImageView
+        android:id="@+id/ws_logo"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="8dp"
+        android:scaleType="center"
+        android:src="@drawable/ws_logo"
+        android:visibility="visible" />
+
+    <RelativeLayout
+        android:id="@+id/login_layout"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginLeft="20dp"
+        android:layout_marginRight="20dp"
+        android:layout_below="@id/ws_logo"
+        android:gravity="center" >
+
+        <FrameLayout
+            android:id="@+id/username_layout"
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center" >
+
+            <EditText
+                android:id="@+id/et_appid"
+                android:layout_width="fill_parent"
+                android:layout_height="50dp"
+                android:background="@drawable/login_edit_bg"
+                android:inputType="text"
+                android:hint="请输入您的鉴权appid"
+                android:paddingLeft="45dp"
+                android:paddingRight="45dp"
+                android:textColorHint="#BFBFBF">
+            </EditText>
+
+            <ImageView
+                android:layout_width="22dp"
+                android:layout_height="21dp"
+                android:layout_gravity="left|center_vertical"
+                android:layout_marginStart="8dp"
+                android:src="@drawable/user"
+                android:visibility="visible" />
+
+            <ImageButton
+                android:id="@+id/btn_appid_clear"
+                android:layout_width="43dp"
+                android:layout_height="43dp"
+                android:layout_gravity="right|center_vertical"
+                android:padding="8dp"
+                android:scaleType="fitXY"
+                android:src="@drawable/clear_input"
+                android:background="@null"
+                android:visibility="invisible" />
+        </FrameLayout>
+
+        <FrameLayout
+            android:id="@+id/usercode_layout"
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content"
+            android:layout_below="@id/username_layout"
+            android:layout_marginTop="6dp"
+            android:gravity="center" >
+
+            <EditText
+                android:id="@+id/et_authkey"
+                android:layout_width="fill_parent"
+                android:layout_height="50dp"
+                android:background="@drawable/login_edit_bg"
+                android:inputType="text"
+                android:paddingLeft="45dp"
+                android:paddingRight="45dp"
+                android:hint="请输入您的鉴权密钥"
+                android:textColorHint="#BFBFBF" >
+            </EditText>
+
+            <ImageView
+                android:layout_width="24dp"
+                android:layout_height="22dp"
+                android:layout_gravity="left|center_vertical"
+                android:layout_marginStart="7dp"
+                android:src="@drawable/key" />
+
+            <ImageButton
+                android:id="@+id/btn_authkey_clear"
+                android:layout_width="43dp"
+                android:layout_height="43dp"
+                android:layout_gravity="right|center_vertical"
+                android:padding="8dp"
+                android:scaleType="fitXY"
+                android:src="@drawable/clear_input"
+                android:background="@null"
+                android:visibility="invisible" />
+        </FrameLayout>
+
+        
+        <Button
+            android:id="@+id/btn_login"
+            android:layout_width="fill_parent"
+            android:layout_height="45dp"
+            android:layout_below="@id/usercode_layout"
+            android:layout_marginTop="30dp"
+            android:background="#ff336699"
+            android:gravity="center"
+            android:text="登录"
+            android:textColor="@android:color/white" />
+    </RelativeLayout>
+
+</RelativeLayout>

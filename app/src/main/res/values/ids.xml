@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <item type="id" name="setting_set_bitrate"></item>
+  <item type="id" name="setting_set_rtmpurl"></item>
+  <item type="id" name="setting_set_camera_focus"></item>
+  <item type="id" name="setting_set_audio_loop"></item>
+  <item type="id" name="setting_set_audio_reverb"></item>
+  <item type="id" name="setting_set_fps"></item>
+  <item type="id" name="setting_set_encode_mode"></item>
+  <item type="id" name="setting_set_flip"></item>
+  <item type="id" name="setting_set_variable_framerate"></item>
+  <item type="id" name="setting_set_auto_bitrate"></item>
+  <item type="id" name="setting_set_record_format"></item>
+  <item type="id" name="setting_set_watermark"></item>
+  <item type="id" name="setting_set_bgm"></item>
+  <item type="id" name="setting_set_volume"></item>
+  <item type="id" name="setting_take_screenshot"></item>
+  <item type="id" name="setting_beauty"></item>
+  <item type="id" name="setting_set_socks5_proxy"></item>
+  <item type="id" name="setting_set_mirror"></item>
+  <item type="id" name="setting_add_question"></item>
+</resources>
