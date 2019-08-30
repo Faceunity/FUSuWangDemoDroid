@@ -9,6 +9,8 @@ import android.app.Application;
 //import com.squareup.leakcanary.watcher.RefWatcher;
 
 public class MyApp extends Application {
+
+    private static MyApp myApp;
     // public static RefWatcher getRefWatcher(Context context) {
     // MyApp application = (MyApp) context.getApplicationContext();
     // return application.refWatcher;
@@ -19,9 +21,15 @@ public class MyApp extends Application {
     // @Override
     public void onCreate() {
         super.onCreate();
+        myApp = this;
+
         ErrorHandler.getInstance().attach(this);
         // refWatcher = LeakCanary.install(this);
         FURenderer.initFURenderer(this);
+    }
+
+    public static MyApp getMyInstance() {
+        return myApp;
     }
 
     public void onTerminate() {

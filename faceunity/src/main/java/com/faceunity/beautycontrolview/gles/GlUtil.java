@@ -41,14 +41,6 @@ public class GlUtil {
         Matrix.setIdentityM(IDENTITY_MATRIX, 0);
     }
 
-//    public static float[] getMiroMatrix() {
-//        return new float[]{-1, 0, 0, 0,
-//                0, 1, 0, 0,
-//                0, 0, 1, 0,
-//                0, 0, 0, 1,
-//        };
-//    }
-
     private static final int SIZEOF_FLOAT = 4;
 
 

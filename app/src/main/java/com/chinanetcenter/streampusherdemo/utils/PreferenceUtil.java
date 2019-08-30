@@ -10,7 +10,8 @@ public class PreferenceUtil {
     public static final String KEY_PREVIEW_HEIGHT = "preview_height";
     public static final String KEY_PREVIEW_MIRROR = "preview_mirror_";
     public static final String KEY_ENCODE_MIRROR = "encode_mirror_";
-    
+    public static final String KEY_FACEUNITY_ISON = "faceunity_ison";
+
     public static boolean persistString(Context context, String key, String value) {
         if(context == null) return false;
         SharedPreferences defaultPreference = PreferenceManager.getDefaultSharedPreferences(context);

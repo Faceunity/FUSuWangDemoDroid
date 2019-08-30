@@ -47,6 +47,7 @@ import com.chinanetcenter.StreamPusher.sdk.SPManager.VideoType;
 import com.chinanetcenter.StreamPusher.sdk.SPStickerController;
 import com.chinanetcenter.StreamPusher.sdk.SPSurfaceView;
 import com.chinanetcenter.StreamPusher.utils.ALog;
+import com.chinanetcenter.streampusherdemo.MyApp;
 import com.chinanetcenter.streampusherdemo.R;
 import com.chinanetcenter.streampusherdemo.adapter.SettingsAdapter;
 import com.chinanetcenter.streampusherdemo.filter.FaceUnityFilter;
@@ -130,6 +131,7 @@ public class MainActivity extends BaseActivity implements OnClickListener, OnIte
     private FaceUnityFilter filter;
     private BeautyControlView beautyControlView;
     private TextView tv_track_text;
+    private String isOn;
 
     private List<SettingItem> mSettingItems = new ArrayList<SettingItem>() {
         {
@@ -517,7 +519,13 @@ public class MainActivity extends BaseActivity implements OnClickListener, OnIte
     }
 
     private void initFilter() {
+        isOn = PreferenceUtil.getString(MyApp.getMyInstance(), PreferenceUtil.KEY_FACEUNITY_ISON);
         tv_track_text = (TextView) findViewById(R.id.tv_track_text);
+        beautyControlView = (BeautyControlView) findViewById(R.id.faceunity_control);
+        if (isOn.equals("false")) {
+            beautyControlView.setVisibility(View.GONE);
+            return;
+        }
         mFURenderer = new FURenderer
                 .Builder(this)
                 .inputTextureType(0)
@@ -532,12 +540,9 @@ public class MainActivity extends BaseActivity implements OnClickListener, OnIte
                         });
                     }
                 })
-                .setCurrentCameraType(mCurrentCameraId)
                 .inputImageOrientation(mCurrentCameraId == CameraInfo.CAMERA_FACING_FRONT ? 90 : 270)
                 //.defaultEffect(EffectEnum.Effect_fengya_ztt_fu.effect())
                 .build();
-
-        beautyControlView = (BeautyControlView) findViewById(R.id.faceunity_control);
         beautyControlView.setOnFaceUnityControlListener(mFURenderer);
         filter = new FaceUnityFilter(this, mFURenderer);
         filter.setCameraId(mCurrentCameraId);
@@ -629,8 +634,10 @@ public class MainActivity extends BaseActivity implements OnClickListener, OnIte
                     mFlashImageBtn.setSelected(false);
                     setButtonEnabled(mFlashImageBtn, false);
 
-                    filter.setCameraId(mCurrentCameraId);
-                    mFURenderer.onCameraChange(mCurrentCameraId, getCameraOrientation(mCurrentCameraId));
+                    if (filter != null) {
+                        filter.setCameraId(mCurrentCameraId);
+                        mFURenderer.onCameraChange(mCurrentCameraId, getCameraOrientation(mCurrentCameraId));
+                    }
                 }
                 break;
             case R.id.btn_flash:

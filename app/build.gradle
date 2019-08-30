@@ -2,7 +2,7 @@ apply plugin: 'com.android.application'
 
 android {
     compileSdkVersion 25
-    buildToolsVersion "27.0.3"
+    buildToolsVersion "28.0.3"
 
     defaultConfig {
         applicationId "com.chinanetcenter.streampusherdemo"
@@ -14,6 +14,7 @@ android {
             sourceCompatibility JavaVersion.VERSION_1_7
             targetCompatibility JavaVersion.VERSION_1_7
         }
+        flavorDimensions "versionCode"
     }
 
     sourceSets.main {
@@ -39,29 +40,29 @@ android {
 //            minifyEnabled false
 //        proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.txt'
 //        }
-        debug {
-            //minifyEnabled true
-            //zipAlignEnabled true
-            //shrinkResources true
-            //proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
-            signingConfig signingConfigs.debug
-            applicationVariants.all { variant ->
-                variant.outputs.each { output ->
-                    println outputFile.name
-                    def outputFile = output.outputFile
-                    if (outputFile != null && outputFile.name.endsWith('.apk')) {
-                        // 输出apk名称为StreamPusherDemo_ V1.8.4.20170527.apk
-                        def fileName = "StreamPusherDemo_${output.name}_V${variant.versionName}.apk"
-                        output.outputFile = new File(outputFile.parent, fileName)
-                    }
-                }
-            }
-        }
-
-        release {
-            signingConfig signingConfigs.debug
-
-        }
+//        debug {
+//            //minifyEnabled true
+//            //zipAlignEnabled true
+//            //shrinkResources true
+//            //proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+//            signingConfig signingConfigs.debug
+//            applicationVariants.all { variant ->
+//                variant.outputs.each { output ->
+//                    println outputFile.name
+//                    def outputFile = output.outputFile
+//                    if (outputFile != null && outputFile.name.endsWith('.apk')) {
+//                        // 输出apk名称为StreamPusherDemo_ V1.8.4.20170527.apk
+//                        def fileName = "StreamPusherDemo_${output.name}_V${variant.versionName}.apk"
+//                        output.outputFile = new File(outputFile.parent, fileName)
+//                    }
+//                }
+//            }
+//        }
+//
+//        release {
+//            signingConfig signingConfigs.debug
+//
+//        }
     }
 
     productFlavors {
@@ -87,18 +88,18 @@ def releaseTime() {
 
 dependencies {
     //compile files('libs/android-support-v4.jar')
-    compile files('libs/auth_sdk_v1.0.2.jar')
-    compile 'com.android.support:support-v4:25.0.0'
-    compile 'com.android.support:appcompat-v7:25.0.0'
-    compile 'com.android.support:recyclerview-v7:25.0.0'
-    compile 'com.github.bumptech.glide:glide:3.7.0'
-    compile files('libs/StreamPusher.jar')
+    implementation files('libs/auth_sdk_v1.0.2.jar')
+    implementation 'com.android.support:support-v4:25.0.0'
+    implementation 'com.android.support:appcompat-v7:25.0.0'
+    implementation 'com.android.support:recyclerview-v7:25.0.0'
+    implementation 'com.github.bumptech.glide:glide:3.7.0'
+    implementation files('libs/StreamPusher.jar')
     //    compile project(':sdk')
     //    senseCompile files('src/sense/libs/st_mobile.jar')
     //    senseCompile project(':STMobileJNI')
     //    faceuCompile files('src/faceu/libs/nama.jar')
     //    faceuCompile 'org.adw.library:discrete-seekbar:1.0.1'
-    compile project(':faceunity')
+    implementation project(':faceunity')
 }
 
 //编译APK

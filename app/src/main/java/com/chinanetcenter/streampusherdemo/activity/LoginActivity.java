@@ -1,16 +1,5 @@
 package com.chinanetcenter.streampusherdemo.activity;
 
-import java.util.HashMap;
-import java.util.Map;
-
-import cnc.cad.validsdk.ValidListener;
-import cnc.cad.validsdk.ValidParam;
-import cnc.cad.validsdk.ValidSdk;
-
-import com.chinanetcenter.StreamPusher.utils.ALog;
-import com.chinanetcenter.streampusherdemo.R;
-import com.chinanetcenter.streampusherdemo.utils.DialogUtils;
-
 import android.app.Activity;
 import android.app.ProgressDialog;
 import android.content.DialogInterface;
@@ -27,10 +16,20 @@ import android.util.Log;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.widget.Button;
-import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.Toast;
+
+import com.chinanetcenter.StreamPusher.utils.ALog;
+import com.chinanetcenter.streampusherdemo.R;
+import com.chinanetcenter.streampusherdemo.utils.DialogUtils;
+
+import java.util.HashMap;
+import java.util.Map;
+
+import cnc.cad.validsdk.ValidListener;
+import cnc.cad.validsdk.ValidParam;
+import cnc.cad.validsdk.ValidSdk;
 
 public class LoginActivity extends Activity implements OnDismissListener {
 
@@ -170,7 +169,6 @@ public class LoginActivity extends Activity implements OnDismissListener {
         mClearAppIdBt.setVisibility(TextUtils.isEmpty(mAppIdET.getText().toString()) ? View.INVISIBLE : View.VISIBLE);
         mAuthKeydET.setText(configs.get("authKey"));
         mClearAuthKeyBt.setVisibility(TextUtils.isEmpty(mAuthKeydET.getText().toString()) ? View.INVISIBLE : View.VISIBLE);
-
     }
 
     private void actionLogin() {

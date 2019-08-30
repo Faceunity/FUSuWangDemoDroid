@@ -1,10 +1,7 @@
 package com.chinanetcenter.streampusherdemo.filter;
 
 import android.content.Context;
-import android.content.res.Configuration;
 import android.hardware.Camera;
-import android.opengl.GLES20;
-import android.opengl.Matrix;
 import android.util.Log;
 
 import com.chinanetcenter.StreamPusher.sdk.SPVideoFilter;
@@ -47,7 +44,7 @@ public class FaceUnityFilter extends SPVideoFilter {
     @Override
     public int onDrawFrame(int tId, FloatBuffer floatBuffer, FloatBuffer floatBuffer1) {
         Log.d("onDrawFrame3:", "cameraId=" + cameraId + "--tid=" + tId);
-        tId = mFURenderer.onDrawFrame(tId, width, height, cameraId);
+        tId = mFURenderer.onDrawFrameSingleInputTex(tId, width, height);
         return super.onDrawFrame(tId, floatBuffer, floatBuffer1);
     }
 
@@ -66,6 +63,7 @@ public class FaceUnityFilter extends SPVideoFilter {
 
     public void setCameraId(int cameraId) {
         this.cameraId = cameraId;
+        mFURenderer.setCurrentCameraType(cameraId);
     }
 
 }

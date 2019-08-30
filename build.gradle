@@ -2,15 +2,17 @@
 buildscript {
     repositories {
         jcenter()
+        google()
     }
     dependencies {
-        classpath 'com.android.tools.build:gradle:2.3.2'
+        classpath 'com.android.tools.build:gradle:3.2.1'
     }
 }
 
 allprojects {
     repositories {
         jcenter()
+        google()
     }
 }
 
@@ -38,22 +40,22 @@ task OutputDemo(type: Copy) {
                 'settings.gradle')
     }
 
-    doLast{
-        println "Hello ,I am OutputDemo, doLast!"
-        String content = "include ':app'";
-        File file = new File("../Demo/settings.gradle");
-        //if file doesnt exists, then create it
-        if(!file.exists()){
-            file.createNewFile();
-        }
-        try{
-            FileWriter fw = new FileWriter(file.getAbsoluteFile());
-            BufferedWriter bw = new BufferedWriter(fw);
-            bw.write(content);
-            bw.close();
-        }catch(Exception e){
-        }
-    }
+//    doLast{
+//        println "Hello ,I am OutputDemo, doLast!"
+//        String content = "include ':app'";
+//        File file = new File("../Demo/settings.gradle");
+//        //if file doesnt exists, then create it
+//        if(!file.exists()){
+//            file.createNewFile();
+//        }
+//        try{
+//            FileWriter fw = new FileWriter(file.getAbsoluteFile());
+//            BufferedWriter bw = new BufferedWriter(fw);
+//            bw.write(content);
+//            bw.close();
+//        }catch(Exception e){
+//        }
+//    }
     into('../Demo')
 }
 
