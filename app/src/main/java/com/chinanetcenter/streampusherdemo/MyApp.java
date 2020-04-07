@@ -1,9 +1,8 @@
 package com.chinanetcenter.streampusherdemo;
 
-import com.chinanetcenter.StreamPusher.utils.ErrorHandler;
-import com.faceunity.beautycontrolview.FURenderer;
-
 import android.app.Application;
+
+import com.chinanetcenter.StreamPusher.utils.ErrorHandler;
 
 //import com.squareup.leakcanary.LeakCanary;
 //import com.squareup.leakcanary.watcher.RefWatcher;
@@ -25,7 +24,6 @@ public class MyApp extends Application {
 
         ErrorHandler.getInstance().attach(this);
         // refWatcher = LeakCanary.install(this);
-        FURenderer.initFURenderer(this);
     }
 
     public static MyApp getMyInstance() {
