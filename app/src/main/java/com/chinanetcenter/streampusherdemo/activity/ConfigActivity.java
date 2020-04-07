@@ -12,7 +12,6 @@ import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
-import android.support.v4.os.AsyncTaskCompat;
 import android.text.TextUtils;
 import android.util.DisplayMetrics;
 import android.view.MotionEvent;
@@ -89,14 +88,15 @@ public class ConfigActivity extends BaseActivity implements OnClickListener {
         super.onCreate(savedInstanceState);
 
         SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(this);
-        String appId = preferences.getString("appId", null);
-        String authKey = preferences.getString("authKey", null);
+        String appId = preferences.getString("appId", "");
+        String authKey = preferences.getString("authKey", "");
         if (TextUtils.isEmpty(appId) || TextUtils.isEmpty(authKey)) {
             Intent loginIntent = new Intent(this, LoginActivity.class);
             startActivity(loginIntent);
             finish();
             return;
         } else {
+            preferences.edit().putString("appId", mAppId).putString("authKey", mAuthKey).apply();
             mAppId = appId;
             mAuthKey = authKey;
         }
@@ -338,7 +338,7 @@ public class ConfigActivity extends BaseActivity implements OnClickListener {
                     int heightInt = heightString == null ? 0 : Integer.parseInt(heightString);
                     if (widthInt > 0 && heightInt > 0) return;
                     //取摄像头支持的预览分辨率
-                    AsyncTaskCompat.executeParallel(new AsyncTask<Void, Void, Camera.Size>() {
+                    AsyncTask<Void, Void, Camera.Size> voidSizeAsyncTask = new AsyncTask<Void, Void, Camera.Size>() {
 
                         Dialog progressDialog = null;
 
@@ -374,7 +374,8 @@ public class ConfigActivity extends BaseActivity implements OnClickListener {
                         }
 
                         ;
-                    });
+                    };
+                    voidSizeAsyncTask.execute();
                 }
             }
         });

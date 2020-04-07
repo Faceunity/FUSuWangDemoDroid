@@ -1,7 +1,5 @@
 package com.chinanetcenter.streampusherdemo.utils;
 
-import com.chinanetcenter.streampusherdemo.R;
-
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.AnimatorSet;
@@ -12,7 +10,6 @@ import android.content.res.Resources;
 import android.graphics.Bitmap;
 import android.graphics.PixelFormat;
 import android.graphics.PointF;
-import android.support.v4.os.AsyncTaskCompat;
 import android.util.DisplayMetrics;
 import android.util.TypedValue;
 import android.view.Display;
@@ -22,6 +19,8 @@ import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.view.animation.Interpolator;
 import android.widget.ImageView;
+
+import com.chinanetcenter.streampusherdemo.R;
 
 public class ScreenShotAnimationExcutor {
   private static final String TAG = "ScreenshotAnimationExcutor";
@@ -142,7 +141,7 @@ public class ScreenShotAnimationExcutor {
         mWindowManager.removeView(mScreenshotLayout);
         //此处不再使用回调，直接简单处理，保存图片
         BitmapSaveTask saveTask = new BitmapSaveTask(mContext);
-        AsyncTaskCompat.executeParallel(saveTask, mScreenBitmap);
+          saveTask.execute(mScreenBitmap);
         // 清空BitMap引用
         mScreenBitmap = null;
         mScreenshotView.setImageBitmap(null);

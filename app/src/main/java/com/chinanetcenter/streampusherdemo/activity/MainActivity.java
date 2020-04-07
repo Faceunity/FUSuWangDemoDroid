@@ -66,9 +66,8 @@ import com.chinanetcenter.streampusherdemo.utils.SettingsPanelViewUtil;
 import com.chinanetcenter.streampusherdemo.video.CustomTextureSource;
 import com.chinanetcenter.streampusherdemo.video.CustomYuvSource;
 import com.chinanetcenter.streampusherdemo.view.MusicPickDialog;
-import com.faceunity.beautycontrolview.BeautyControlView;
-import com.faceunity.beautycontrolview.EffectEnum;
-import com.faceunity.beautycontrolview.FURenderer;
+import com.faceunity.nama.FURenderer;
+import com.faceunity.nama.ui.BeautyControlView;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -129,9 +128,7 @@ public class MainActivity extends BaseActivity implements OnClickListener, OnIte
     //外部滤镜
     private FURenderer mFURenderer;
     private FaceUnityFilter filter;
-    private BeautyControlView beautyControlView;
     private TextView tv_track_text;
-    private String isOn;
 
     private List<SettingItem> mSettingItems = new ArrayList<SettingItem>() {
         {
@@ -155,7 +152,7 @@ public class MainActivity extends BaseActivity implements OnClickListener, OnIte
             add(new SettingItem(R.id.setting_add_question, "答题", 0, true));
         }
     };
-    private int mCurrentCameraId = CameraInfo.CAMERA_FACING_FRONT;
+    private int mCameraId = CameraInfo.CAMERA_FACING_FRONT;
     private boolean mIsUserPushing = false;
     private boolean mUseYuvPreHandler = false;
     private int mOpenedCameraId = -1;
@@ -343,7 +340,7 @@ public class MainActivity extends BaseActivity implements OnClickListener, OnIte
         Bundle bundle = getIntent().getExtras();
 
         mPushUrl = bundle.getString("rtmp", "");
-        mCurrentCameraId = bundle.getInt("camera", -1);
+        mCameraId = bundle.getInt("camera", -1);
         AudioSourceMode audioSourceMode = (AudioSourceMode) bundle.getSerializable("audio_source_mode");
         int encoderState = bundle.getInt("encoder", -1);
         int decoderState = bundle.getInt("decoder", -1);
@@ -365,7 +362,7 @@ public class MainActivity extends BaseActivity implements OnClickListener, OnIte
         mSPConfig = SPManager.getConfig();
         mSPConfig.setRtmpUrl(mPushUrl);
         mSPConfig.setSurfaceView(mPreviewView);
-        mSPConfig.setCameraId(mCurrentCameraId);
+        mSPConfig.setCameraId(mCameraId);
         mSPConfig.setAudioSourceMode(audioSourceMode);
         mSPConfig.setEncoderMode(encoderState);
         mSPConfig.setDecoderMode(decoderState);
@@ -502,7 +499,7 @@ public class MainActivity extends BaseActivity implements OnClickListener, OnIte
 
         mIsUserPushing = state.isPushing;
         btn_record.setSelected(mIsUserPushing);
-        mCurrentCameraId = config.getCameraId();
+        mCameraId = config.getCameraId();
 
         setButtonEnabled(mFlashImageBtn, state.isSupportFlash);
         mFlashImageBtn.setSelected(state.isFlashing);
@@ -519,16 +516,19 @@ public class MainActivity extends BaseActivity implements OnClickListener, OnIte
     }
 
     private void initFilter() {
-        isOn = PreferenceUtil.getString(MyApp.getMyInstance(), PreferenceUtil.KEY_FACEUNITY_ISON);
+        String isOn = PreferenceUtil.getString(MyApp.getMyInstance(), PreferenceUtil.KEY_FACEUNITY_ISON);
         tv_track_text = (TextView) findViewById(R.id.tv_track_text);
-        beautyControlView = (BeautyControlView) findViewById(R.id.faceunity_control);
-        if (isOn.equals("false")) {
+        BeautyControlView beautyControlView = (BeautyControlView) findViewById(R.id.faceunity_control);
+        if ("false".equals(isOn)) {
             beautyControlView.setVisibility(View.GONE);
             return;
         }
+        FURenderer.initFURenderer(this);
         mFURenderer = new FURenderer
                 .Builder(this)
-                .inputTextureType(0)
+                .setInputTextureType(FURenderer.INPUT_2D_TEXTURE)
+                .setCameraType(mCameraId)
+                .setInputImageOrientation(FURenderer.getCameraOrientation(mCameraId))
                 .setOnTrackingStatusChangedListener(new FURenderer.OnTrackingStatusChangedListener() {
                     @Override
                     public void onTrackingStatusChanged(final int status) {
@@ -540,19 +540,10 @@ public class MainActivity extends BaseActivity implements OnClickListener, OnIte
                         });
                     }
                 })
-                .inputImageOrientation(mCurrentCameraId == CameraInfo.CAMERA_FACING_FRONT ? 90 : 270)
-                //.defaultEffect(EffectEnum.Effect_fengya_ztt_fu.effect())
                 .build();
         beautyControlView.setOnFaceUnityControlListener(mFURenderer);
-        filter = new FaceUnityFilter(this, mFURenderer);
-        filter.setCameraId(mCurrentCameraId);
+        filter = new FaceUnityFilter(mFURenderer);
         SPManager.setFilter(filter);
-    }
-
-    public int getCameraOrientation(int cameraId) {
-        Camera.CameraInfo info = new Camera.CameraInfo();
-        Camera.getCameraInfo(cameraId, info);
-        return info.orientation;
     }
 
     private void showRtmpUrl() {
@@ -564,7 +555,6 @@ public class MainActivity extends BaseActivity implements OnClickListener, OnIte
     protected void onResume() {
         Log.e(TAG, "onResume()...");
         super.onResume();
-        beautyControlView.onResume();
     }
 
     @Override
@@ -630,13 +620,12 @@ public class MainActivity extends BaseActivity implements OnClickListener, OnIte
                 break;
             case R.id.btn_switch:
                 if (SPManager.switchCamera()) {
-                    mCurrentCameraId = mCurrentCameraId == 0 ? 1 : 0;
+                    mCameraId = mCameraId == 0 ? 1 : 0;
                     mFlashImageBtn.setSelected(false);
                     setButtonEnabled(mFlashImageBtn, false);
 
-                    if (filter != null) {
-                        filter.setCameraId(mCurrentCameraId);
-                        mFURenderer.onCameraChange(mCurrentCameraId, getCameraOrientation(mCurrentCameraId));
+                    if (mFURenderer != null) {
+                        mFURenderer.onCameraChanged(mCameraId, FURenderer.getCameraOrientation(mCameraId));
                     }
                 }
                 break;
@@ -678,7 +667,6 @@ public class MainActivity extends BaseActivity implements OnClickListener, OnIte
     protected void onPause() {
         Log.e(TAG, "onPause()...");
         super.onPause();
-        beautyControlView.onPause();
     }
 
     @Override
