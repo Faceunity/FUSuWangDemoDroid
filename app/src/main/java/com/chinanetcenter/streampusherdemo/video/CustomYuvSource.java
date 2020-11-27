@@ -18,16 +18,19 @@ import com.chinanetcenter.StreamPusher.sdk.SPManager;
 import com.chinanetcenter.StreamPusher.sdk.SPSurfaceView;
 import com.chinanetcenter.StreamPusher.utils.ALog;
 
+import java.util.Iterator;
+import java.util.List;
+
 @SuppressWarnings("deprecation")
 public class CustomYuvSource {
     private static final String TAG = "VideoSource";
 
     public static int SOURCE_PORTRAIT = 1;
     public static int source_LANDSCAPE = 2;
-    
+
     protected VideoParameters mParameters = null;
     protected int  mRotateDegree = 0;;
-    
+
     private Camera mCamera = null;
     private SPSurfaceView mSurfaceView = null;
     private SurfaceHolder.Callback mSurfaceHolderCallback = null;
@@ -53,11 +56,11 @@ public class CustomYuvSource {
             camera.addCallbackBuffer(data);
         }
     };
-    
+
     public void setCameraId(int cameraId) {
         mParameters.cameraid = cameraId;
     }
-    
+
     public void setVideoResolution(int width, int height) {
         mParameters.video_width = width;
         mParameters.video_height = height;
@@ -84,7 +87,7 @@ public class CustomYuvSource {
                     if (!mSurfaceReady && holder != null) {
                         ALog.d(TAG, "Surface created mSurfaceReady is false !");
                         mSurfaceReady = true;
-                        
+
                         open();
                         start();
                     }
@@ -116,7 +119,7 @@ public class CustomYuvSource {
             ALog.e(TAG, "Reopen Camera !");
             return;
         }
-        
+
         if(mParameters.cameraid < 0) {
             if (eventsHandler != null) {
                 eventsHandler.onCameraError("invalid camera id :" + mParameters.cameraid);
@@ -275,7 +278,7 @@ public class CustomYuvSource {
         ALog.d(TAG, "getRotation rotation: " + rotation + ", degrees: " + degrees + ", result: " + result + ", info.orientation: " + info.orientation + ", info.facing: " + info.facing);
         return result;
     }
-    
+
     public static  Camera.Size getPreviewSize(Context context, Camera camera) {
         if (camera == null || context == null)
             return null;
@@ -311,7 +314,7 @@ public class CustomYuvSource {
         Log.i(TAG, "preview width: " + optimalSize.width + ", height: " + optimalSize.height);
         return optimalSize;
     }
-    
+
     public static int getCameraId(){
         int cameraNum = Camera.getNumberOfCameras();
         int availableId = -1;
@@ -322,7 +325,7 @@ public class CustomYuvSource {
         }
         return availableId;
     }
-    
+
     private byte[] rotateYUVDegree270(byte[] data, int imageWidth, int imageHeight){
         byte[] yuv =new byte[imageWidth*imageHeight*3/2];
         // Rotate the Y luma
@@ -332,37 +335,37 @@ public class CustomYuvSource {
                         yuv[i]= data[y*imageWidth+x];
                         i++;
             }
-      }// Rotate the U and V color components 
+        }// Rotate the U and V color components
         i = imageWidth*imageHeight;
         for(int x = imageWidth-1;x >0;x=x-2){
             for(int y =0;y < imageHeight/2;y++){
-                   yuv[i]= data[(imageWidth*imageHeight)+(y*imageWidth)+(x-1)];
-                     i++;
-                   yuv[i]= data[(imageWidth*imageHeight)+(y*imageWidth)+x];
-                        i++;
+                yuv[i]= data[(imageWidth*imageHeight)+(y*imageWidth)+(x-1)];
+                i++;
+                yuv[i]= data[(imageWidth*imageHeight)+(y*imageWidth)+x];
+                i++;
             }
         }
         return yuv;
     }
-    
-    private byte[] rotateYUVDegree90(byte[] data, int imageWidth, int imageHeight) 
+
+    private byte[] rotateYUVDegree90(byte[] data, int imageWidth, int imageHeight)
     {
         byte [] yuv = new byte[imageWidth*imageHeight*3/2];
         // Rotate the Y luma
         int i = 0;
         for(int x = 0;x < imageWidth;x++)
         {
-            for(int y = imageHeight-1;y >= 0;y--)                               
+            for(int y = imageHeight-1;y >= 0;y--)
             {
                 yuv[i] = data[y*imageWidth+x];
                 i++;
             }
         }
-        // Rotate the U and V color components 
+        // Rotate the U and V color components
         i = imageWidth*imageHeight*3/2-1;
         for(int x = imageWidth-1;x > 0;x=x-2)
         {
-            for(int y = 0;y < imageHeight/2;y++)                                
+            for(int y = 0;y < imageHeight/2;y++)
             {
                 yuv[i] = data[(imageWidth*imageHeight)+(y*imageWidth)+x];
                 i--;
@@ -378,7 +381,7 @@ public class CustomYuvSource {
     }
 
     public static interface CameraEventsHandler {
-        
+
         void onCameraError(String errorDescription);
 
         void onCameraOpening(int cameraId);
@@ -387,7 +390,7 @@ public class CustomYuvSource {
 
         void onCameraClosed();
     }
-    
+
     private class VideoParameters {
         public int video_width = 0;
         public int video_height = 0;

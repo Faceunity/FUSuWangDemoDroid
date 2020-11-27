@@ -14,6 +14,7 @@ import android.os.Bundle;
 import android.preference.PreferenceManager;
 import android.text.TextUtils;
 import android.util.DisplayMetrics;
+import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.View.OnClickListener;
@@ -61,6 +62,7 @@ public class ConfigActivity extends BaseActivity implements OnClickListener {
     private CheckBox mPlayerTestCb;
     private RadioGroup mCustomVideoSourceRg;
     private RadioGroup mSoftEncodeStragetyRg;
+    private RadioGroup mRtmpPushStreamTypeRg;
     private Switch mYuvPreHandlerSourceSw;
     private Switch mEchoCancellationSw;
 
@@ -77,10 +79,10 @@ public class ConfigActivity extends BaseActivity implements OnClickListener {
     private String mAuthKey = null;
     private boolean mDemoDebug = false;
 
-    private Integer[] mBitrates = {500 * 1024, 800 * 1024, 1000 * 1024, 1200 * 1024, 1500 * 1024};
-    private Integer[] mSamples = {44100, 16000, 8000};
+    private Integer[] mBitrates = { 500 * 1024, 800 * 1024, 1000 * 1024, 1200 * 1024, 1500 * 1024 };
+    private Integer[] mSamples = { 44100, 16000, 8000 };
 
-    private VideoResolution mSelectedResolution = VideoResolution.VIDEO_RESOLUTION_360P;
+    private VideoResolution mSelectedResolution = VideoResolution.VIDEO_RESOLUTION_720P;
     private AudioSourceMode mAudioSourceMode = AudioSourceMode.AUDIORECORD_MODE;
 
     @Override
@@ -88,15 +90,15 @@ public class ConfigActivity extends BaseActivity implements OnClickListener {
         super.onCreate(savedInstanceState);
 
         SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(this);
-        String appId = preferences.getString("appId", "");
-        String authKey = preferences.getString("authKey", "");
+        preferences.edit().putString("appId", "请输入appId").putString("authKey", "请输入authKey").apply();
+        String appId = preferences.getString("appId", null);
+        String authKey = preferences.getString("authKey", null);
         if (TextUtils.isEmpty(appId) || TextUtils.isEmpty(authKey)) {
             Intent loginIntent = new Intent(this, LoginActivity.class);
             startActivity(loginIntent);
             finish();
             return;
         } else {
-            preferences.edit().putString("appId", mAppId).putString("authKey", mAuthKey).apply();
             mAppId = appId;
             mAuthKey = authKey;
         }
@@ -109,7 +111,7 @@ public class ConfigActivity extends BaseActivity implements OnClickListener {
         mAudioPlayMethod = SPConfig.AUDIO_PLAY_AUDIOTRACK;
         mBitrate = mBitrates[0];
         if (mDemoDebug) {
-            mBitrates = new Integer[]{500 * 1024, 800 * 1024, 1000 * 1024, 1200 * 1024, 1500 * 1024};
+            mBitrates = new Integer[] { 500 * 1024, 800 * 1024, 1000 * 1024, 1200 * 1024, 1500 * 1024 };
         }
 
         mUrl = getResources().getString(R.string.rtmp_url);
@@ -130,6 +132,7 @@ public class ConfigActivity extends BaseActivity implements OnClickListener {
 
     private void refreshConfigPage() {
         SPConfig config = SPManager.getConfig();
+        config.setVideoResolution(VideoResolution.VIDEO_RESOLUTION_720P, VideoRatio.RATIO_16_9);
         // url
         // if(!TextUtils.isEmpty(config.getRtmpUrl())){
         // mPushUrlEt.setText(config.getRtmpUrl());
@@ -167,7 +170,7 @@ public class ConfigActivity extends BaseActivity implements OnClickListener {
         // resolution
         mSelectedResolution = config.getVideoResolution();
         if (mSelectedResolution == VideoResolution.VIDEO_RESOLUTION_CUSTOM) {
-            mSelectedResolution = VideoResolution.VIDEO_RESOLUTION_360P;
+            mSelectedResolution = VideoResolution.VIDEO_RESOLUTION_720P;
         }
         mResSp.setSelection(mSelectedResolution.ordinal());
 
@@ -323,11 +326,11 @@ public class ConfigActivity extends BaseActivity implements OnClickListener {
         mhasAudioCb = (CheckBox) findViewById(R.id.has_audio);
         mCustomVideoSourceRg = (RadioGroup) findViewById(R.id.custom_video_source_rg);
         mCustomVideoSourceRg.check(mCustomVideoSourceRg.getChildAt(0).getId());
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.JELLY_BEAN_MR2) {
+        if(Build.VERSION.SDK_INT < Build.VERSION_CODES.JELLY_BEAN_MR2) {
             //SPManager.pushTextureFrame方法只支持EGL14上下文环境，并且4.3及以上版本
             mCustomVideoSourceRg.getChildAt(2).setVisibility(View.GONE);
         }
-        mCustomVideoSourceRg.setOnCheckedChangeListener(new RadioGroup.OnCheckedChangeListener() {
+        mCustomVideoSourceRg.setOnCheckedChangeListener(new RadioGroup.OnCheckedChangeListener(){
             @Override
             public void onCheckedChanged(RadioGroup group, int checkedId) {
                 if (checkedId == group.getChildAt(1).getId()) {//yuv方式需要使用摄像头采集，需要先初始化摄像头预览参数
@@ -336,17 +339,15 @@ public class ConfigActivity extends BaseActivity implements OnClickListener {
                     String heightString = PreferenceUtil.getString(context, PreferenceUtil.KEY_PREVIEW_HEIGHT);
                     int widthInt = widthString == null ? 0 : Integer.parseInt(widthString);
                     int heightInt = heightString == null ? 0 : Integer.parseInt(heightString);
-                    if (widthInt > 0 && heightInt > 0) return;
+                    if(widthInt > 0 && heightInt > 0) return;
                     //取摄像头支持的预览分辨率
-                    AsyncTask<Void, Void, Camera.Size> voidSizeAsyncTask = new AsyncTask<Void, Void, Camera.Size>() {
+                    new AsyncTask<Void, Void, Camera.Size>() {
 
                         Dialog progressDialog = null;
 
                         protected void onPreExecute() {
                             progressDialog = DialogUtils.showSimpleProgressDialog(context, "正在初始化。。。", false, null);
-                        }
-
-                        ;
+                        };
 
                         @Override
                         protected Camera.Size doInBackground(Void... params) {
@@ -371,17 +372,17 @@ public class ConfigActivity extends BaseActivity implements OnClickListener {
                                 VideoResolution.VIDEO_RESOLUTION_CUSTOM.setWidth(result.width);
                                 VideoResolution.VIDEO_RESOLUTION_CUSTOM.setHeight(result.height);
                             }
-                        }
-
-                        ;
-                    };
-                    voidSizeAsyncTask.execute();
+                        };
+                    }.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
                 }
             }
         });
 
         mSoftEncodeStragetyRg = (RadioGroup) findViewById(R.id.soft_encode_stragety_rg);
         mSoftEncodeStragetyRg.check(mSoftEncodeStragetyRg.getChildAt(0).getId());
+
+        mRtmpPushStreamTypeRg = (RadioGroup) findViewById(R.id.rtmp_push_stream_type_rg);
+        mRtmpPushStreamTypeRg.check(mRtmpPushStreamTypeRg.getChildAt(0).getId());
 
         mEchoCancellationSw = ((Switch) findViewById(R.id.echo_cancellatione_sw));
         mEchoCancellationSw.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
@@ -437,8 +438,13 @@ public class ConfigActivity extends BaseActivity implements OnClickListener {
                     frameRate = Integer.parseInt(frameRateStr);
                 }
 
+                int customVideoSource = mCustomVideoSourceRg.indexOfChild(mCustomVideoSourceRg.findViewById(mCustomVideoSourceRg.getCheckedRadioButtonId()));
                 Intent intent;
-                intent = new Intent(this, MainActivity.class);
+                if (customVideoSource == 2) {
+                    intent = new Intent(this, MainCustomActivity.class);
+                }else {
+                    intent = new Intent(this, MainActivity.class);
+                }
                 intent.putExtra("rtmp", url);
                 intent.putExtra("camera", mCameraState);
                 intent.putExtra("audio_source_mode", mAudioSourceMode);
@@ -452,10 +458,11 @@ public class ConfigActivity extends BaseActivity implements OnClickListener {
                 intent.putExtra("authKey", mAuthKey);
                 intent.putExtra("has_video", mhasVideoCb.isChecked());
                 intent.putExtra("has_audio", mhasAudioCb.isChecked());
-                intent.putExtra("custom_video_source", mCustomVideoSourceRg.indexOfChild(mCustomVideoSourceRg.findViewById(mCustomVideoSourceRg.getCheckedRadioButtonId())));
+                intent.putExtra("custom_video_source", customVideoSource);
                 intent.putExtra("echo_cancellatione", mEchoCancellationSw.isChecked());
                 intent.putExtra("yuv_pre_handler", mYuvPreHandlerSourceSw.isChecked());
                 intent.putExtra("soft_encode_stragety", mSoftEncodeStragetyRg.getCheckedRadioButtonId() == R.id.soft_encode_stragety_quality ? SPConfig.SOFT_ENCODE_STRATEGY_MORE_QUALITY : SPConfig.SOFT_ENCODE_STRATEGY_MORE_BITRATE);
+                intent.putExtra("push_stream_type", mRtmpPushStreamTypeRg.getCheckedRadioButtonId() == R.id.rtmp_push_stream_type_camera ? SPManager.PushStreamType.TYPE_CAMERA : SPManager.PushStreamType.TYPE_SCREEN);
                 startActivity(intent);
 
                 // finish();

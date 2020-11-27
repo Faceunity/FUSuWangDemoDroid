@@ -245,10 +245,42 @@
             </LinearLayout>
 
             <LinearLayout
+                android:id="@+id/rtmp_push_stream_type_l"
+                android:layout_width="fill_parent"
+                android:layout_height="wrap_content"
+                android:layout_below="@id/soft_encode_stragety_l"
+                android:orientation="horizontal" >
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center_vertical"
+                    android:text="流类型"
+                    android:textSize="14sp" />
+                <RadioGroup
+                    android:id="@+id/rtmp_push_stream_type_rg"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal" >
+
+                    <RadioButton
+                        android:id="@+id/rtmp_push_stream_type_camera"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="摄像头" />
+
+                    <RadioButton
+                        android:id="@+id/rtmp_push_stream_type_screen"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="录屏" />
+                </RadioGroup>
+            </LinearLayout>
+
+            <LinearLayout
                 android:id="@+id/frame_rate"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_below="@id/soft_encode_stragety_l" >
+                android:layout_below="@id/rtmp_push_stream_type_l" >
 
                 <TextView
                     android:layout_width="wrap_content"
@@ -262,7 +294,7 @@
                     android:layout_height="wrap_content"
                     android:inputType="number"
                     android:maxLength="2"
-                    android:text="15" />
+                    android:text="30" />
 
                 <TextView
                     android:layout_width="wrap_content"
@@ -382,11 +414,13 @@
                         android:text="关" />
 
                     <RadioButton
+                        android:id="@+id/rb_yuv"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:checked="false"
                         android:text="YUV" />
                     <RadioButton
+                        android:id="@+id/rb_texture"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:checked="false"

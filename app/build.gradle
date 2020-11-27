@@ -1,20 +1,19 @@
 apply plugin: 'com.android.application'
 
 android {
-    compileSdkVersion 28
-    buildToolsVersion "28.0.3"
+    compileSdkVersion 29
+    buildToolsVersion '29.0.3'
 
     defaultConfig {
         applicationId "com.chinanetcenter.streampusherdemo"
-        minSdkVersion 18
-        targetSdkVersion 28
-        versionCode 20180202
-        versionName "1.8.7"
+        minSdkVersion 19
+        targetSdkVersion 29
+        versionCode 20200629
+        versionName "2.1.0.${releaseTime()}"
         compileOptions {
             sourceCompatibility JavaVersion.VERSION_1_7
             targetCompatibility JavaVersion.VERSION_1_7
         }
-        flavorDimensions "versionCode"
     }
 
     sourceSets.main {
@@ -36,46 +35,39 @@ android {
     }
 
     buildTypes {
-//        release {
-//            minifyEnabled false
-//        proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.txt'
-//        }
-//        debug {
-//            //minifyEnabled true
-//            //zipAlignEnabled true
-//            //shrinkResources true
-//            //proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
-//            signingConfig signingConfigs.debug
-//            applicationVariants.all { variant ->
-//                variant.outputs.each { output ->
-//                    println outputFile.name
-//                    def outputFile = output.outputFile
-//                    if (outputFile != null && outputFile.name.endsWith('.apk')) {
-//                        // 输出apk名称为StreamPusherDemo_ V1.8.4.20170527.apk
-//                        def fileName = "StreamPusherDemo_${output.name}_V${variant.versionName}.apk"
-//                        output.outputFile = new File(outputFile.parent, fileName)
-//                    }
-//                }
-//            }
-//        }
-//
-//        release {
-//            signingConfig signingConfigs.debug
-//
-//        }
-    }
-
-    productFlavors {
-        normal{
-            versionName "1.8.7.${releaseTime()}"
+        debug {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            signingConfig signingConfigs.debug
+            //重命名apk
+            applicationVariants.all { variant ->
+                variant.outputs.all { output ->
+                    outputFileName = "StreamPusherDemo_${output.name}_V${variant.mergedFlavor.versionName}.apk"
+                }
+            }
         }
 
-//        sense{
-//            versionName "1.8.7.${releaseTime()}"
-//            minSdkVersion 17
-//        }
+        release {
+            minifyEnabled true
+            zipAlignEnabled true
+            shrinkResources true
+            signingConfig signingConfigs.debug
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    flavorDimensions "app"
+    productFlavors {
+        normal{
+            dimension "app"
+        }
+
 //        faceu{
-//            versionName "1.8.7.${releaseTime()}"
+//            dimension "app"
+//            minSdkVersion 18
+//            ndk {
+//                abiFilters 'armeabi-v7a', 'arm64-v8a', 'x86_64', 'x86'
+//            }
 //        }
     }
 
@@ -87,28 +79,23 @@ def releaseTime() {
 
 
 dependencies {
-    //compile files('libs/android-support-v4.jar')
     implementation files('libs/auth_sdk_v1.0.2.jar')
-    implementation 'com.android.support:support-v4:28.0.0'
-    implementation 'com.android.support:appcompat-v7:28.0.0'
-    implementation 'com.android.support:recyclerview-v7:28.0.0'
-    implementation 'com.github.bumptech.glide:glide:3.7.0'
+    implementation 'androidx.appcompat:appcompat:1.0.2'
+    implementation 'androidx.constraintlayout:constraintlayout:1.1.3'
+    implementation "androidx.recyclerview:recyclerview:1.1.0"
+    implementation 'com.github.bumptech.glide:glide:4.11.0'
+    implementation 'pl.droidsonroids.gif:android-gif-drawable:1.2.15'
     implementation files('libs/StreamPusher.jar')
-    //    compile project(':sdk')
-    //    senseCompile files('src/sense/libs/st_mobile.jar')
-    //    senseCompile project(':STMobileJNI')
-    //    faceuCompile files('src/faceu/libs/nama.jar')
-    //    faceuCompile 'org.adw.library:discrete-seekbar:1.0.1'
     implementation project(':faceunity')
 }
 
 //编译APK
-// gradlew OutputSDK
+// gradlew OutputAPK
 task OutputAPK(type: Copy) {
     println "Hello ,I am OutputAPK!"
     OutputAPK.dependsOn(build)
     //推流SDK
-    from('build/outputs/apk/') {
+    from('build/outputs/apk/debug/') {
         into('/')
         include('**')
     }

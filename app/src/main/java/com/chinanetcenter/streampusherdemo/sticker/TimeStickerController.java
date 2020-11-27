@@ -155,7 +155,7 @@ public class TimeStickerController extends SPStickerController {
                 textSizePx = (int) (mDrawHeight * TEXT_HEIGHT);
             }
             mTimePaint = new Paint();
-            mTimePaint.setTypeface(Typeface.create(Typeface.DEFAULT_BOLD, 1));
+            mTimePaint.setTypeface(Typeface.create(Typeface.DEFAULT_BOLD, Typeface.BOLD));
             mTimePaint.setColor(TEXT_COLOR);
             mTimePaint.setTextSize(textSizePx);
             mTimePaint.setAntiAlias(true);

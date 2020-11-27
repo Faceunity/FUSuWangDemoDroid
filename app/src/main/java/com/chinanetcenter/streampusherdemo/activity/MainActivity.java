@@ -2,7 +2,11 @@ package com.chinanetcenter.streampusherdemo.activity;
 
 import android.Manifest;
 import android.app.AlertDialog;
+import android.content.ComponentName;
+import android.content.Context;
 import android.content.DialogInterface;
+import android.content.Intent;
+import android.content.ServiceConnection;
 import android.content.SharedPreferences;
 import android.content.SharedPreferences.Editor;
 import android.content.pm.ActivityInfo;
@@ -11,9 +15,14 @@ import android.content.res.Configuration;
 import android.graphics.Color;
 import android.hardware.Camera;
 import android.hardware.Camera.CameraInfo;
+import android.hardware.Sensor;
+import android.hardware.SensorEvent;
+import android.hardware.SensorEventListener;
+import android.hardware.SensorManager;
 import android.opengl.GLSurfaceView;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.IBinder;
 import android.os.Message;
 import android.preference.PreferenceManager;
 import android.text.TextUtils;
@@ -55,6 +64,7 @@ import com.chinanetcenter.streampusherdemo.object.Question;
 import com.chinanetcenter.streampusherdemo.object.QuestionGroup;
 import com.chinanetcenter.streampusherdemo.object.QuestionUtils;
 import com.chinanetcenter.streampusherdemo.object.SettingItem;
+import com.chinanetcenter.streampusherdemo.service.FloatWindowService;
 import com.chinanetcenter.streampusherdemo.sticker.GifStickerController;
 import com.chinanetcenter.streampusherdemo.sticker.MoveStickerController;
 import com.chinanetcenter.streampusherdemo.sticker.TimeStickerController;
@@ -67,7 +77,8 @@ import com.chinanetcenter.streampusherdemo.video.CustomTextureSource;
 import com.chinanetcenter.streampusherdemo.video.CustomYuvSource;
 import com.chinanetcenter.streampusherdemo.view.MusicPickDialog;
 import com.faceunity.nama.FURenderer;
-import com.faceunity.nama.ui.BeautyControlView;
+import com.faceunity.nama.ui.FaceUnityView;
+import com.faceunity.nama.utils.CameraUtils;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -77,12 +88,18 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Locale;
 
-public class MainActivity extends BaseActivity implements OnClickListener, OnItemClickListener {
+public class MainActivity extends BaseActivity implements OnClickListener, OnItemClickListener, SensorEventListener {
     private static final String TAG = "MainActivity";
 
     private SPSurfaceView mPreviewView;
+    private ViewGroup mPreviewViewGroup;
+    private ViewGroup.LayoutParams mPreviewLayoutParams;
+    private ServiceConnection mFloatWindowServiceConnection;
+    private FloatWindowService mFloatWindowService;
     private TextView mRtmpUrlTv;
+    private TextView mTvFps;
     private TextView mInfoTv;
     private SPConfig mSPConfig = null;
     private ImageButton btn_record;
@@ -106,6 +123,7 @@ public class MainActivity extends BaseActivity implements OnClickListener, OnIte
     private int mScreenOrientation;
 
     private boolean mIsUserRecording = false;
+    private SPManager.PushStreamType mPushStreamType = SPManager.PushStreamType.TYPE_CAMERA;
 
     private OutputFormat mOutputFormat = OutputFormat.MUXER_OUTPUT_FLV;
     private VideoType mVideoType = VideoType.TYPE_SHORT_VIDEO;
@@ -113,7 +131,7 @@ public class MainActivity extends BaseActivity implements OnClickListener, OnIte
     public long mVideoMaxRecordDuration = 10 * 1000; // ms
     public long mGIFMaxRecordDuration = 1 * 1000; // ms
 
-    private boolean[] mWaterMarkSelected = new boolean[]{false/*timeMark*/, false/*logoMark*/, false/*timeSticker*/, false/*logoSticker*/, false/*moveSticker*/, false/*gifSticker*/};
+    private boolean[] mWaterMarkSelected = new boolean[]{false/*timeMark*/, false/*logoMark*/,false/*timeSticker*/,false/*logoSticker*/,false/*moveSticker*/, false/*gifSticker*/};
     private SPStickerController mStickerControllers[] = new SPStickerController[6];
 
     private MusicPickDialog mBgmPickDialog = null;
@@ -127,6 +145,7 @@ public class MainActivity extends BaseActivity implements OnClickListener, OnIte
     private VideoRatio mVideoRatio;
     //外部滤镜
     private FURenderer mFURenderer;
+    private SensorManager mSensorManager;
     private FaceUnityFilter filter;
     private TextView tv_track_text;
 
@@ -152,7 +171,7 @@ public class MainActivity extends BaseActivity implements OnClickListener, OnIte
             add(new SettingItem(R.id.setting_add_question, "答题", 0, true));
         }
     };
-    private int mCameraId = CameraInfo.CAMERA_FACING_FRONT;
+    private int mCurrentCameraId = CameraInfo.CAMERA_FACING_FRONT;
     private boolean mIsUserPushing = false;
     private boolean mUseYuvPreHandler = false;
     private int mOpenedCameraId = -1;
@@ -167,6 +186,7 @@ public class MainActivity extends BaseActivity implements OnClickListener, OnIte
         // init
         initFromIntent();
         initLayoutState();
+        bindFloatWindowService();
         checkAndRequestPermission();
 
         Log.i(TAG, "onCreate -- ");
@@ -176,7 +196,7 @@ public class MainActivity extends BaseActivity implements OnClickListener, OnIte
         initFilter();
         // yuv 预处理
         if (mUseYuvPreHandler) {
-            Log.e(TAG, "yuvPreHandleryuvPreHandleryuvPreHandler");
+            Log.e(TAG,"yuvPreHandleryuvPreHandleryuvPreHandler");
             SPManager.setPreProcessHandler(new PreProcessHandler() {
 
                 @Override
@@ -189,8 +209,6 @@ public class MainActivity extends BaseActivity implements OnClickListener, OnIte
         mVideoHeight = state.videoHeight;
         mVideoWidth = state.videoWidth;
         //将DialogUtils中记录的标志位置为默认
-        DialogUtils.mCurrenStyleFilter = 0;
-        DialogUtils.mCurrenCustomFilter = 0;
 
     }
 
@@ -294,11 +312,11 @@ public class MainActivity extends BaseActivity implements OnClickListener, OnIte
                             break;
                         case SPManager.STATE_VIDEO_RESOLUTION_CHANGED:
                             try {
-                                ALog.i(TAG, (String) msg.obj);
-                                JSONObject jsonObject = new JSONObject((String) msg.obj);
-                                int w = jsonObject.optInt("w");
-                                int h = jsonObject.optInt("h");
-                                updateWaterMarkState(h > w ? Configuration.ORIENTATION_PORTRAIT : Configuration.ORIENTATION_LANDSCAPE);
+                                ALog.i(TAG, (String)msg.obj);
+                                JSONObject jsonObject = new JSONObject((String)msg.obj);
+                                mVideoWidth = jsonObject.optInt("w");
+                                mVideoHeight = jsonObject.optInt("h");
+                                updateWaterMarkState(mVideoHeight > mVideoWidth ? Configuration.ORIENTATION_PORTRAIT : Configuration.ORIENTATION_LANDSCAPE);
                             } catch (JSONException e) {
                                 e.printStackTrace();
                             }
@@ -340,7 +358,7 @@ public class MainActivity extends BaseActivity implements OnClickListener, OnIte
         Bundle bundle = getIntent().getExtras();
 
         mPushUrl = bundle.getString("rtmp", "");
-        mCameraId = bundle.getInt("camera", -1);
+        mCurrentCameraId = bundle.getInt("camera", -1);
         AudioSourceMode audioSourceMode = (AudioSourceMode) bundle.getSerializable("audio_source_mode");
         int encoderState = bundle.getInt("encoder", -1);
         int decoderState = bundle.getInt("decoder", -1);
@@ -358,11 +376,12 @@ public class MainActivity extends BaseActivity implements OnClickListener, OnIte
         int customVideoSource = bundle.getInt("custom_video_source");
         boolean echoCancellatione = bundle.getBoolean("echo_cancellatione");
         mUseYuvPreHandler = bundle.getBoolean("yuv_pre_handler");
+        mPushStreamType = (SPManager.PushStreamType) bundle.get("push_stream_type");
 
         mSPConfig = SPManager.getConfig();
         mSPConfig.setRtmpUrl(mPushUrl);
         mSPConfig.setSurfaceView(mPreviewView);
-        mSPConfig.setCameraId(mCameraId);
+        mSPConfig.setCameraId(mCurrentCameraId);
         mSPConfig.setAudioSourceMode(audioSourceMode);
         mSPConfig.setEncoderMode(encoderState);
         mSPConfig.setDecoderMode(decoderState);
@@ -384,14 +403,16 @@ public class MainActivity extends BaseActivity implements OnClickListener, OnIte
             {
                 String widthString = PreferenceUtil.getString(MainActivity.this, PreferenceUtil.KEY_PREVIEW_WIDTH);
                 String heightString = PreferenceUtil.getString(MainActivity.this, PreferenceUtil.KEY_PREVIEW_HEIGHT);
-                int widthInt = widthString == null ? 0 : Integer.parseInt(widthString);
-                int heightInt = heightString == null ? 0 : Integer.parseInt(heightString);
+//                int widthInt = widthString == null ? 0 : Integer.parseInt(widthString);
+//                int heightInt = heightString == null ? 0 : Integer.parseInt(heightString);
+                int widthInt = 1280;
+                int heightInt = 720;
                 // 设置摄像头支持的预览宽高
                 // 取预览宽高的时候是宽大于高的，所以设置预览宽高时也要宽大于高
                 CustomYuvSource customYuvSource = new CustomYuvSource(widthInt, heightInt);
                 customYuvSource.setDisplayPreview(mPreviewView);
                 if (widthInt > 0 && heightInt > 0) {
-                    Log.i(TAG, "custom video width : " + widthInt + ", height : " + heightInt);
+                    Log.i(TAG,"custom video width : " + widthInt + ", height : " + heightInt);
                     if (mScreenOrientation == Configuration.ORIENTATION_PORTRAIT) {
                         VideoResolution.VIDEO_RESOLUTION_CUSTOM.setWidth(heightInt);
                         VideoResolution.VIDEO_RESOLUTION_CUSTOM.setHeight(widthInt);
@@ -438,7 +459,7 @@ public class MainActivity extends BaseActivity implements OnClickListener, OnIte
     }
 
     private void initLayout() {
-        //setContentView(R.layout.activity_main);        
+        //setContentView(R.layout.activity_main);
         Bundle bundle = getIntent().getExtras();
         mScreenOrientation = bundle.getInt("screenOrientation");
         int requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED;
@@ -469,7 +490,10 @@ public class MainActivity extends BaseActivity implements OnClickListener, OnIte
 
         mPreviewView = (SPSurfaceView) findViewById(R.id.preview);
         mPreviewView.setScalingType(SPSurfaceView.SPScalingType.SCALE_ASPECT_FIT);
+        mPreviewViewGroup = (ViewGroup) mPreviewView.getParent();
+        mPreviewLayoutParams = mPreviewView.getLayoutParams();
         mInfoTv = (TextView) findViewById(R.id.tv_info);
+        mTvFps = (TextView) findViewById(R.id.tv_fps);
 
         btn_record = (ImageButton) findViewById(R.id.btn_record);
         btn_record.setOnClickListener(this);
@@ -499,7 +523,7 @@ public class MainActivity extends BaseActivity implements OnClickListener, OnIte
 
         mIsUserPushing = state.isPushing;
         btn_record.setSelected(mIsUserPushing);
-        mCameraId = config.getCameraId();
+        mCurrentCameraId = config.getCameraId();
 
         setButtonEnabled(mFlashImageBtn, state.isSupportFlash);
         mFlashImageBtn.setSelected(state.isFlashing);
@@ -518,32 +542,57 @@ public class MainActivity extends BaseActivity implements OnClickListener, OnIte
     private void initFilter() {
         String isOn = PreferenceUtil.getString(MyApp.getMyInstance(), PreferenceUtil.KEY_FACEUNITY_ISON);
         tv_track_text = (TextView) findViewById(R.id.tv_track_text);
-        BeautyControlView beautyControlView = (BeautyControlView) findViewById(R.id.faceunity_control);
+        FaceUnityView beautyControlView = findViewById(R.id.faceunity_control);
         if ("false".equals(isOn)) {
             beautyControlView.setVisibility(View.GONE);
             return;
         }
-        FURenderer.initFURenderer(this);
         mFURenderer = new FURenderer
                 .Builder(this)
-                .setInputTextureType(FURenderer.INPUT_2D_TEXTURE)
-                .setCameraType(mCameraId)
-                .setInputImageOrientation(FURenderer.getCameraOrientation(mCameraId))
-                .setOnTrackingStatusChangedListener(new FURenderer.OnTrackingStatusChangedListener() {
+                .setInputTextureType(FURenderer.INPUT_TEXTURE_2D)
+                .setCameraFacing(mCurrentCameraId)
+                .setCreateEglContext(true)
+                .setInputImageOrientation(CameraUtils.getCameraOrientation(mCurrentCameraId))
+                .setRunBenchmark(true)
+                .setOnDebugListener(new FURenderer.OnDebugListener() {
                     @Override
-                    public void onTrackingStatusChanged(final int status) {
+                    public void onFpsChanged(double fps, double callTime) {
+                        final String FPS = String.format(Locale.getDefault(), "%.2f", fps);
+                        Log.e(TAG, "onFpsChanged: FPS " + FPS + " callTime " + String.format(Locale.getDefault(), "%.2f", callTime));
                         runOnUiThread(new Runnable() {
                             @Override
                             public void run() {
+                                if (mTvFps != null) {
+                                    mTvFps.setText("FPS: " + FPS);
+                                }
+                            }
+                        });
+                    }
+                })
+                .setOnTrackStatusChangedListener(new FURenderer.OnTrackStatusChangedListener() {
+                    @Override
+                    public void onTrackStatusChanged(final int type, final int status) {
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                tv_track_text.setText(type == FURenderer.TRACK_TYPE_FACE ? R.string.toast_not_detect_face : R.string.toast_not_detect_face_or_body);
                                 tv_track_text.setVisibility(status > 0 ? View.INVISIBLE : View.VISIBLE);
                             }
                         });
                     }
                 })
                 .build();
-        beautyControlView.setOnFaceUnityControlListener(mFURenderer);
-        filter = new FaceUnityFilter(mFURenderer);
+        beautyControlView.setModuleManager(mFURenderer);
+        filter = new FaceUnityFilter(this, mFURenderer);
         SPManager.setFilter(filter);
+
+        if (mFURenderer.getMakeupModule() != null) {
+            mFURenderer.getMakeupModule().setIsMakeupFlipPoints(mCurrentCameraId == 0 ? 0 : 1);
+        }
+
+        mSensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
+        Sensor sensor = mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
+        mSensorManager.registerListener(this, sensor, SensorManager.SENSOR_DELAY_NORMAL);
     }
 
     private void showRtmpUrl() {
@@ -561,26 +610,44 @@ public class MainActivity extends BaseActivity implements OnClickListener, OnIte
     protected void onStart() {
         Log.e(TAG, "onStart()...");
         super.onStart();
-        SPManager.onResume();
-        if (mIsUserPushing) {
-            SPManager.startPushStream();
-        }
         showPushInfo();
+        if(mPushStreamType != SPManager.PushStreamType.TYPE_SCREEN) {
+            SPManager.onResume();
+            //非录屏推流不支持后台推流，退后台需停止推流，回前台重新开始推流
+            if(mIsUserPushing) {
+                SPManager.startPushStream(SPManager.PushStreamType.TYPE_CAMERA);
+            }
+        } else {
+            if(mFloatWindowService != null) {
+                dismissFloatView();
+            } else {
+                SPManager.onResume();
+            }
+        }
+
     }
 
     @Override
     public void onClick(final View v) {
+
         switch (v.getId()) {
             case R.id.btn_record:
                 mIsUserPushing = !mIsUserPushing;
                 boolean mIsSuccess = false;
                 if (mIsUserPushing) {
-                    mIsSuccess = SPManager.startPushStream();
+                    if(mPushStreamType == SPManager.PushStreamType.TYPE_SCREEN) {
+                        //必须先调用service的startForeground，否则android 10以后将无法拿到录屏权限，导致崩溃
+                        mFloatWindowService.showRecordingNotification();
+                    }
+                    mIsSuccess = SPManager.startPushStream(mPushStreamType);
                     mPreviewHeight = SPManager.getPushState().previewHeight;
                     mPreviewWidth = SPManager.getPushState().previewWidth;
 
                 } else {
                     mIsSuccess = SPManager.stopPushStream();
+                    if(mPushStreamType == SPManager.PushStreamType.TYPE_SCREEN) {
+                        mFloatWindowService.cancleRecordingNotification();
+                    }
                     if (mIsUserRecording && mIsSuccess) {
                         mIsUserRecording = !mIsUserRecording;
                         SPManager.stopRecord();
@@ -591,7 +658,7 @@ public class MainActivity extends BaseActivity implements OnClickListener, OnIte
                 if (!mIsSuccess) {
                     mIsUserPushing = !mIsUserPushing;
                 }
-                if (mScreenOrientation == Configuration.ORIENTATION_UNDEFINED) {
+                if(mScreenOrientation==Configuration.ORIENTATION_UNDEFINED){
                     if (mIsUserPushing) {
                         lockScreenToCurrentOrientation();
                     } else {
@@ -620,12 +687,15 @@ public class MainActivity extends BaseActivity implements OnClickListener, OnIte
                 break;
             case R.id.btn_switch:
                 if (SPManager.switchCamera()) {
-                    mCameraId = mCameraId == 0 ? 1 : 0;
+                    mCurrentCameraId = mCurrentCameraId == 0 ? 1 : 0;
                     mFlashImageBtn.setSelected(false);
                     setButtonEnabled(mFlashImageBtn, false);
 
                     if (mFURenderer != null) {
-                        mFURenderer.onCameraChanged(mCameraId, FURenderer.getCameraOrientation(mCameraId));
+                        mFURenderer.onCameraChanged(mCurrentCameraId, CameraUtils.getCameraOrientation(mCurrentCameraId));
+                        if (mFURenderer.getMakeupModule() != null) {
+                            mFURenderer.getMakeupModule().setIsMakeupFlipPoints(mCurrentCameraId == 0 ? 0 : 1);
+                        }
                     }
                 }
                 break;
@@ -671,23 +741,21 @@ public class MainActivity extends BaseActivity implements OnClickListener, OnIte
 
     @Override
     protected void onStop() {
-        Log.e(TAG, "onStop()...");
+        Log.e(TAG, "onStop()... isFinishing ： " + isFinishing());
         // 为保证时序，只有当前Activity才调用SPManager接口
         if (mCurActivityHashCode == this.hashCode()) {
-            mFlashImageBtn.setSelected(false);
-            ALog.i(TAG, "onStop -- ");
-            if (mIsUserPushing) {
-                ALog.i(TAG, "onStop -- SPManager.stopPushStream();");
-                SPManager.stopPushStream();
-
+            if(isFinishing() || mPushStreamType != SPManager.PushStreamType.TYPE_SCREEN) {
+                if(mIsUserPushing) {
+                    SPManager.stopPushStream();
+                }
+                if (mIsUserRecording) {
+                    SPManager.stopRecord();
+                }
+                SPManager.onPause();
+            } else {
+                showFloatView();
             }
-            ALog.i(TAG, "onStop -- SPManager.stopRecord():" + mIsUserRecording);
-            if (mIsUserRecording) {
-                SPManager.stopRecord();
-            }
-            SPManager.onPause();
         }
-
         super.onStop();
     }
 
@@ -696,18 +764,24 @@ public class MainActivity extends BaseActivity implements OnClickListener, OnIte
         ALog.i(TAG, "onDestroy -- ");
         // 为保证时序，只有当前Activity才调用SPManager接口
         if (mCurActivityHashCode == this.hashCode()) {
+            SPManager.stopPushStream();
+            SPManager.onPause();
             SPManager.release();
+            //内部是静态引用，要主动置null，否则可能造成内存泄漏
+            SPManager.setOnErrorListener(null);
+            SPManager.setOnStateListener(null);
         }
-        //将DialogUtils中记录的标志位置为默认
-        DialogUtils.mCurrenStyleFilter = 0;
-        DialogUtils.mCurrenCustomFilter = 0;
+        if (mSensorManager != null) {
+            mSensorManager.unregisterListener(this);
+        }
+        dismissFloatView();
+        unbindFloatWindowService();
         super.onDestroy();
     }
 
     @Override
     public void onBackPressed() {
         super.onBackPressed();
-        finish();
     }
 
     protected void setButtonEnabled(ImageButton button, boolean enabled) {
@@ -760,7 +834,7 @@ public class MainActivity extends BaseActivity implements OnClickListener, OnIte
                 et.setText(mPushUrl);
                 break;
             case R.id.setting_set_camera_focus:
-                DialogUtils.showSingleChoiceDialog(this, "请选择聚焦模式", new String[]{"自动聚焦", "手动聚焦"}, SPManager.getConfig().isCameraManualFocusMode() ? 1 : 0, new DialogInterface.OnClickListener() {
+                DialogUtils.showSingleChoiceDialog(this, "请选择聚焦模式", new String[] { "自动聚焦", "手动聚焦" }, SPManager.getConfig().isCameraManualFocusMode() ? 1 : 0, new DialogInterface.OnClickListener() {
 
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
@@ -770,7 +844,7 @@ public class MainActivity extends BaseActivity implements OnClickListener, OnIte
                 });
                 break;
             case R.id.setting_set_audio_loop:
-                DialogUtils.showSingleChoiceDialog(this, "耳返", new String[]{"关闭", "打开"}, SPManager.getPushState().audioLoopActive ? 1 : 0, new DialogInterface.OnClickListener() {
+                DialogUtils.showSingleChoiceDialog(this, "耳返", new String[] { "关闭", "打开" }, SPManager.getPushState().audioLoopActive ? 1 : 0, new DialogInterface.OnClickListener() {
 
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
@@ -780,7 +854,7 @@ public class MainActivity extends BaseActivity implements OnClickListener, OnIte
                 });
                 break;
             case R.id.setting_set_audio_reverb:
-                DialogUtils.showSingleChoiceDialog(this, "混响", new String[]{"关闭", "level-1", "level-2", "level-3", "level-4", "level-5"}, SPManager.getPushState().audioReverbLevel, new DialogInterface.OnClickListener() {
+                DialogUtils.showSingleChoiceDialog(this, "混响", new String[] { "关闭", "level-1", "level-2", "level-3", "level-4", "level-5" }, SPManager.getPushState().audioReverbLevel, new DialogInterface.OnClickListener() {
 
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
@@ -803,7 +877,7 @@ public class MainActivity extends BaseActivity implements OnClickListener, OnIte
                             if (mBgmPlayer != null) {//正在播放，停止播放
                                 SPManager.releaseBgmPlayer(mBgmPlayer);
                                 mBgmPlayer = null;
-                                if (mBgmPickDialog != null) {
+                                if(mBgmPickDialog != null) {
                                     mBgmPickDialog.setActivePlayer(null);
                                 }
                             } else {//当前没有歌曲播放，则开始播放
@@ -815,10 +889,10 @@ public class MainActivity extends BaseActivity implements OnClickListener, OnIte
                                     try {
                                         mBgmPlayer = SPManager.createBgmPlayer(mBgmFiles.get(mCurrentBgmIndex));
                                         mBgmPlayer.setPlayerListener(mBgmListener);
-                                        if (mBgmFiles.size() == 1) {//单首歌曲设置循环播放
+                                        if(mBgmFiles.size() == 1) {//单首歌曲设置循环播放
                                             mBgmPlayer.setLooping(true);
                                         }
-                                        if (mBgmPickDialog != null) {
+                                        if(mBgmPickDialog != null) {
                                             mBgmPickDialog.setActivePlayer(mBgmPlayer);
                                         }
                                     } catch (Exception e) {
@@ -828,7 +902,7 @@ public class MainActivity extends BaseActivity implements OnClickListener, OnIte
                                 }
                             }
                             mIsPause = false;
-                        } else if (which == DialogInterface.BUTTON_NEGATIVE) {
+                        } else if(which == DialogInterface.BUTTON_NEGATIVE) {
                             if (mBgmPlayer == null) {
                                 showToast("当前没有背景音在播放");
                                 return;
@@ -925,7 +999,7 @@ public class MainActivity extends BaseActivity implements OnClickListener, OnIte
                     Toast.makeText(MainActivity.this, " 该参数只能在非推流状态下设置", Toast.LENGTH_SHORT).show();
                     return;
                 }
-                DialogUtils.showSingleChoiceDialog(this, "请选择可变帧率状态", new String[]{"关闭", "打开"}, config.isVarFramerate() ? 1 : 0, new DialogInterface.OnClickListener() {
+                DialogUtils.showSingleChoiceDialog(this, "请选择可变帧率状态", new String[] { "关闭", "打开" }, config.isVarFramerate() ? 1 : 0, new DialogInterface.OnClickListener() {
 
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
@@ -942,7 +1016,7 @@ public class MainActivity extends BaseActivity implements OnClickListener, OnIte
                     return;
                 }
                 final SPConfig spConfig = SPManager.getConfig();
-                DialogUtils.showSingleChoiceDialog(this, "请选择聚码率自适应状态", new String[]{"关闭", "打开"}, config.isAutoBitrate() ? 1 : 0, new DialogInterface.OnClickListener() {
+                DialogUtils.showSingleChoiceDialog(this, "请选择聚码率自适应状态", new String[] { "关闭", "打开" }, config.isAutoBitrate() ? 1 : 0, new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
                         SPManager.setConfig(config.setAutoBitrate(which == 1));
@@ -978,7 +1052,7 @@ public class MainActivity extends BaseActivity implements OnClickListener, OnIte
                 });
                 break;
             case R.id.setting_take_screenshot:
-                new ScreenContentRecorder(MainActivity.this).takeShotOptional(mPreviewView, findViewById(android.R.id.content));
+                new ScreenContentRecorder(MainActivity.this, mFloatWindowService).takeShotOptional(mPreviewView, findViewById(android.R.id.content));
                 break;
             case R.id.setting_beauty:
                 DialogUtils.showBeautyPickDialog(MainActivity.this);
@@ -989,7 +1063,7 @@ public class MainActivity extends BaseActivity implements OnClickListener, OnIte
                     return;
                 }
                 final SPConfig.Socks5Proxy proxyConfig = SPManager.getConfig().getSocks5Proxy();
-                DialogUtils.showSingleChoiceDialog(this, "请设置代理服务器", new String[]{"关闭", "打开"}, proxyConfig.enabled ? 1 : 0, new DialogInterface.OnClickListener() {
+                DialogUtils.showSingleChoiceDialog(this, "请设置代理服务器", new String[] { "关闭", "打开" }, proxyConfig.enabled ? 1 : 0, new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
                         proxyConfig.enabled = (which == 1);
@@ -1004,12 +1078,12 @@ public class MainActivity extends BaseActivity implements OnClickListener, OnIte
             case R.id.setting_set_mirror:
                 boolean mirrorParams[] = new boolean[2];
                 getMirrorParam(mirrorParams);
-                DialogUtils.showMultiChoiceDialog(this, "镜像调节", new String[]{"预览镜像", "编码镜像"}, mirrorParams, new DialogInterface.OnMultiChoiceClickListener() {
+                DialogUtils.showMultiChoiceDialog(this, "镜像调节", new String[]{ "预览镜像", "编码镜像" }, mirrorParams, new DialogInterface.OnMultiChoiceClickListener() {
                     @Override
                     public void onClick(DialogInterface dialog, int which, boolean isChecked) {
-                        if (which == 0) {//设置预览镜像
+                        if(which == 0) {//设置预览镜像
                             PreferenceUtil.persistString(MainActivity.this, PreferenceUtil.KEY_PREVIEW_MIRROR + mOpenedCameraId, "" + isChecked);
-                        } else if (which == 1) {//设置编码镜像
+                        }else if(which == 1) {//设置编码镜像
                             PreferenceUtil.persistString(MainActivity.this, PreferenceUtil.KEY_ENCODE_MIRROR + mOpenedCameraId, "" + isChecked);
                         }
                     }
@@ -1032,22 +1106,22 @@ public class MainActivity extends BaseActivity implements OnClickListener, OnIte
                     return;
                 }
                 final QuestionGroup questions = QuestionUtils.loadTestQuestions(this);
-                if (questions == null || questions.questionList == null || questions.questionList.isEmpty()) {
-                    Toast.makeText(this, "未找到可用题目", Toast.LENGTH_LONG).show();
+                if(questions == null || questions.questionList == null || questions.questionList.isEmpty()) {
+                    Toast.makeText(this, "未找到可用题目",Toast.LENGTH_LONG).show();
                     break;
                 }
                 final String questionStrings[] = new String[questions.questionList.size()];
                 for (int i = 0; i < questionStrings.length; i++) {
                     Question question = questions.questionList.get(i);
-                    if (question.type == Question.TYPE_SINGLE_CHOICE) {
+                    if(question.type == Question.TYPE_SINGLE_CHOICE) {
                         questionStrings[i] = "(单选) " + question.question;
-                    } else if (question.type == Question.TYPE_MULTI_CHOICE) {
+                    }else  if(question.type == Question.TYPE_MULTI_CHOICE){
                         questionStrings[i] = "(多选) " + question.question;
                     } else {
                         questionStrings[i] = question.question;
                     }
                 }
-                DialogUtils.showSingleChoiceDialog(this, "请选择测试题目", questionStrings, 0, new DialogInterface.OnClickListener() {
+                DialogUtils.showSingleChoiceDialog(this, "请选择测试题目",questionStrings, 0, new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
                         QuestionGroup questionGroup = new QuestionGroup();
@@ -1092,23 +1166,23 @@ public class MainActivity extends BaseActivity implements OnClickListener, OnIte
         }
 
         //时间贴图
-        if (mWaterMarkSelected[2]) {
-            if (mStickerControllers[2] == null) {
+        if(mWaterMarkSelected[2]) {
+            if(mStickerControllers[2] == null) {
                 TimeStickerController stickerObject = new TimeStickerController(this);
                 stickerObject.zOrder = 2;
                 mStickerControllers[2] = stickerObject;
                 SPManager.addSticker(stickerObject);
             }
         } else {
-            if (mStickerControllers[2] != null) {
+            if(mStickerControllers[2] != null) {
                 SPManager.removeSticker(mStickerControllers[2]);
                 mStickerControllers[2] = null;
             }
         }
 
         //logo贴图
-        if (mWaterMarkSelected[3]) {
-            if (mStickerControllers[3] == null) {
+        if(mWaterMarkSelected[3]) {
+            if(mStickerControllers[3] == null) {
                 MoveStickerController stickerObject = new MoveStickerController(this);
                 stickerObject.x = 0.85f;
                 stickerObject.y = 0.0f;
@@ -1119,15 +1193,15 @@ public class MainActivity extends BaseActivity implements OnClickListener, OnIte
                 SPManager.addSticker(stickerObject);
             }
         } else {
-            if (mStickerControllers[3] != null) {
+            if(mStickerControllers[3] != null) {
                 SPManager.removeSticker(mStickerControllers[3]);
                 mStickerControllers[3] = null;
             }
         }
 
         //移动贴图
-        if (mWaterMarkSelected[4]) {
-            if (mStickerControllers[4] == null) {
+        if(mWaterMarkSelected[4]) {
+            if(mStickerControllers[4] == null) {
                 MoveStickerController stickerObject = new MoveStickerController(this);
                 stickerObject.x = stickerObject.y = 0.0f;
                 if (orientation == ActivityInfo.SCREEN_ORIENTATION_PORTRAIT) {
@@ -1145,15 +1219,15 @@ public class MainActivity extends BaseActivity implements OnClickListener, OnIte
                 SPManager.addSticker(stickerObject);
             }
         } else {
-            if (mStickerControllers[4] != null) {
+            if(mStickerControllers[4] != null) {
                 SPManager.removeSticker(mStickerControllers[4]);
                 mStickerControllers[4] = null;
             }
         }
 
         //gif贴图
-        if (mWaterMarkSelected[5]) {
-            if (mStickerControllers[5] == null) {
+        if(mWaterMarkSelected[5]) {
+            if(mStickerControllers[5] == null) {
                 GifStickerController gifStickerObject = new GifStickerController(this);
                 gifStickerObject.x = 0.1f;
                 gifStickerObject.y = 0.4f;
@@ -1166,7 +1240,7 @@ public class MainActivity extends BaseActivity implements OnClickListener, OnIte
                 SPManager.addSticker(gifStickerObject);
             }
         } else {
-            if (mStickerControllers[5] != null) {
+            if(mStickerControllers[5] != null) {
                 SPManager.removeSticker(mStickerControllers[5]);
                 mStickerControllers[5] = null;
             }
@@ -1252,7 +1326,7 @@ public class MainActivity extends BaseActivity implements OnClickListener, OnIte
             default:
                 break;
         }
-        DialogUtils.showSingleChoiceDialog(this, "请选择录制小视频的格式", new String[]{"flv", "mp4", "gif"}, whichFormat, new DialogInterface.OnClickListener() {
+        DialogUtils.showSingleChoiceDialog(this, "请选择录制小视频的格式", new String[] { "flv", "mp4", "gif" }, whichFormat, new DialogInterface.OnClickListener() {
 
             @Override
             public void onClick(DialogInterface dialog, int which) {
@@ -1262,7 +1336,7 @@ public class MainActivity extends BaseActivity implements OnClickListener, OnIte
                     case 0:
                         mOutputFormat = OutputFormat.MUXER_OUTPUT_FLV;
                         mVideoType = VideoType.TYPE_SHORT_VIDEO;
-                        DialogUtils.showSingleChoiceDialog(MainActivity.this, "请选择录制小视频的类型", new String[]{"短视频", "长视频"}, whichType, new DialogInterface.OnClickListener() {
+                        DialogUtils.showSingleChoiceDialog(MainActivity.this, "请选择录制小视频的类型", new String[] { "短视频", "长视频" }, whichType, new DialogInterface.OnClickListener() {
 
                             @Override
                             public void onClick(DialogInterface dialog, int which) {
@@ -1288,7 +1362,7 @@ public class MainActivity extends BaseActivity implements OnClickListener, OnIte
                     case 1:
                         mOutputFormat = OutputFormat.MUXER_OUTPUT_MPEG_4;
                         mVideoType = VideoType.TYPE_SHORT_VIDEO;
-                        DialogUtils.showSingleChoiceDialog(MainActivity.this, "请选择录制小视频的类型", new String[]{"短视频", "长视频"}, whichType, new DialogInterface.OnClickListener() {
+                        DialogUtils.showSingleChoiceDialog(MainActivity.this, "请选择录制小视频的类型", new String[] { "短视频", "长视频" }, whichType, new DialogInterface.OnClickListener() {
 
                             @Override
                             public void onClick(DialogInterface dialog, int which) {
@@ -1331,7 +1405,7 @@ public class MainActivity extends BaseActivity implements OnClickListener, OnIte
     }
 
     private void showRecordShortVideoParameterInputDialog() {
-        DialogUtils.showConfigInputDialog(this, EditorInfo.TYPE_NUMBER_FLAG_DECIMAL, new String[]{"mVideoMaxRecordDuration"}, new String[]{String.valueOf(mVideoMaxRecordDuration)}, new String[]{"时长[3000~60000],单位ms"}, new InputConfigClickListener() {
+        DialogUtils.showConfigInputDialog(this, EditorInfo.TYPE_NUMBER_FLAG_DECIMAL, new String[] { "mVideoMaxRecordDuration" }, new String[] { String.valueOf(mVideoMaxRecordDuration) }, new String[] { "时长[3000~60000],单位ms" }, new InputConfigClickListener() {
 
             @Override
             public void onResult(DialogInterface dialog, HashMap<String, String> result) {
@@ -1357,7 +1431,7 @@ public class MainActivity extends BaseActivity implements OnClickListener, OnIte
     }
 
     private void showRecordGIFVideoParameterInputDialog() {
-        DialogUtils.showConfigInputDialog(this, EditorInfo.TYPE_NUMBER_FLAG_DECIMAL, new String[]{"mGIFMaxRecordDuration"}, new String[]{String.valueOf(mGIFMaxRecordDuration)}, new String[]{"时长[1000~5000],单位ms"}, new InputConfigClickListener() {
+        DialogUtils.showConfigInputDialog(this, EditorInfo.TYPE_NUMBER_FLAG_DECIMAL, new String[] { "mGIFMaxRecordDuration" }, new String[] { String.valueOf(mGIFMaxRecordDuration) }, new String[] { "时长[1000~5000],单位ms" }, new InputConfigClickListener() {
 
             @Override
             public void onResult(DialogInterface dialog, HashMap<String, String> result) {
@@ -1382,7 +1456,7 @@ public class MainActivity extends BaseActivity implements OnClickListener, OnIte
     }
 
     private void showRecordLongVideoParameterInputDialog() {
-        DialogUtils.showConfigInputDialog(this, EditorInfo.TYPE_NUMBER_FLAG_DECIMAL, new String[]{"mMaxRecordFileSize"}, new String[]{String.valueOf(mMaxRecordFileSize)}, new String[]{"大小[ >=102400],单位byte"}, new InputConfigClickListener() {
+        DialogUtils.showConfigInputDialog(this, EditorInfo.TYPE_NUMBER_FLAG_DECIMAL, new String[] { "mMaxRecordFileSize" }, new String[] { String.valueOf(mMaxRecordFileSize) }, new String[] { "大小[ >=102400],单位byte" }, new InputConfigClickListener() {
 
             @Override
             public void onResult(DialogInterface dialog, HashMap<String, String> result) {
@@ -1408,7 +1482,7 @@ public class MainActivity extends BaseActivity implements OnClickListener, OnIte
     }
 
     private void showAutoBitrateRangeInputDialog() {
-        DialogUtils.showConfigInputDialog(MainActivity.this, EditorInfo.TYPE_CLASS_NUMBER, new String[]{"min_bitrate", "max_bitrate"}, new String[]{String.valueOf(mSPConfig.getVideoResolution().getMinBitrate() / 1024), String.valueOf(mSPConfig.getVideoResolution().getMaxBitrate() / 1024)}, new String[]{"上限", "下限"}, new InputConfigClickListener() {
+        DialogUtils.showConfigInputDialog(MainActivity.this, EditorInfo.TYPE_CLASS_NUMBER, new String[] { "min_bitrate", "max_bitrate" }, new String[] { String.valueOf(mSPConfig.getVideoResolution().getMinBitrate() / 1024), String.valueOf(mSPConfig.getVideoResolution().getMaxBitrate() / 1024) }, new String[] { "上限", "下限" }, new InputConfigClickListener() {
 
             @Override
             public void onResult(DialogInterface dialog, HashMap<String, String> result) {
@@ -1429,7 +1503,7 @@ public class MainActivity extends BaseActivity implements OnClickListener, OnIte
 
     private void showSocks5ProxyInputDialog() {
         final SPConfig.Socks5Proxy socks5Proxy = SPManager.getConfig().getSocks5Proxy();
-        DialogUtils.showConfigInputDialog(MainActivity.this, EditorInfo.TYPE_CLASS_TEXT, new String[]{"socks5_ip", "socks5_port", "socks5_username", "socks5_pwd"}, new String[]{socks5Proxy.ip, String.valueOf(socks5Proxy.port), socks5Proxy.username, socks5Proxy.pwd}, new String[]{"IP", "端口", "用户名", "密码"}, new InputConfigClickListener() {
+        DialogUtils.showConfigInputDialog(MainActivity.this, EditorInfo.TYPE_CLASS_TEXT, new String[] { "socks5_ip", "socks5_port", "socks5_username", "socks5_pwd" }, new String[] { socks5Proxy.ip, String.valueOf(socks5Proxy.port), socks5Proxy.username, socks5Proxy.pwd }, new String[] { "IP", "端口", "用户名", "密码" }, new InputConfigClickListener() {
 
             @Override
             public void onResult(DialogInterface dialog, HashMap<String, String> result) {
@@ -1447,21 +1521,19 @@ public class MainActivity extends BaseActivity implements OnClickListener, OnIte
             }
         });
     }
-
     /**
      * 返回当前设置的镜像参数
      * param[0]:预览是否镜像
      * param[1]:编码是否镜像
-     *
      * @param params
      */
     private void getMirrorParam(boolean params[]) {
         String previewStr = PreferenceUtil.getString(MainActivity.this, PreferenceUtil.KEY_PREVIEW_MIRROR + mOpenedCameraId);
         //如果用户没有设置预览镜像，默认前置摄像头预览镜像，后置摄像头不镜像
-        params[0] = previewStr == null ? mOpenedCameraId == Camera.CameraInfo.CAMERA_FACING_FRONT : Boolean.parseBoolean(previewStr);
+        params[0] = previewStr == null ? mOpenedCameraId == Camera.CameraInfo.CAMERA_FACING_FRONT : Boolean.parseBoolean(previewStr) ;
         String encodeStr = PreferenceUtil.getString(MainActivity.this, PreferenceUtil.KEY_ENCODE_MIRROR + mOpenedCameraId);
         //如果用户没有设置编码镜像，默认编码不镜像
-        params[1] = encodeStr == null ? false : Boolean.parseBoolean(encodeStr);
+        params[1] = encodeStr == null ? false : Boolean.parseBoolean(encodeStr) ;
     }
 
     @Override
@@ -1484,14 +1556,14 @@ public class MainActivity extends BaseActivity implements OnClickListener, OnIte
             mBgmPlayer = null;
             mIsPause = false;
             mCurrentBgmIndex = -1;
-            if (mBgmPickDialog != null) {
+            if(mBgmPickDialog != null) {
                 mBgmPickDialog.setActivePlayer(null);
             }
         }
 
         @Override
         public void onPrepared(SPAudioPlayer ap) {
-            if (mBgmPlayer != ap) return;
+            if(mBgmPlayer != ap) return;
             try {
                 //必须等待onPrepared回调后才可以播放
                 ap.start();
@@ -1502,13 +1574,13 @@ public class MainActivity extends BaseActivity implements OnClickListener, OnIte
 
         @Override
         public void onCompletion(SPAudioPlayer ap) {
-            if (mBgmPlayer != ap) {
+            if(mBgmPlayer != ap) {
                 SPManager.releaseBgmPlayer(ap);
             }
-            if (mBgmPlayer != null) {
+            if(mBgmPlayer != null) {
                 SPManager.releaseBgmPlayer(mBgmPlayer);
                 mBgmPlayer = null;
-                if (mBgmPickDialog != null) {
+                if(mBgmPickDialog != null) {
                     mBgmPickDialog.setActivePlayer(null);
                 }
             }
@@ -1523,10 +1595,10 @@ public class MainActivity extends BaseActivity implements OnClickListener, OnIte
             try {
                 mBgmPlayer = SPManager.createBgmPlayer(mBgmFiles.get(mCurrentBgmIndex));
                 mBgmPlayer.setPlayerListener(mBgmListener);
-                if (mBgmFiles.size() == 1) {//单首歌曲设置循环播放
+                if(mBgmFiles.size() == 1) {//单首歌曲设置循环播放
                     mBgmPlayer.setLooping(true);
                 }
-                if (mBgmPickDialog != null) {
+                if(mBgmPickDialog != null) {
                     mBgmPickDialog.setActivePlayer(mBgmPlayer);
                 }
             } catch (Exception e) {
@@ -1542,4 +1614,80 @@ public class MainActivity extends BaseActivity implements OnClickListener, OnIte
         }
     };
 
+    private void showFloatView() {
+        if(mFloatWindowService == null) {
+            return;
+        }
+        ViewGroup viewGroup = (ViewGroup) mPreviewView.getParent();
+        if(viewGroup != null) {
+            viewGroup.removeView(mPreviewView);
+        }
+        if(checkOverlayPermission()) {
+            mFloatWindowService.showFloatSurfaceView(mPreviewView, mVideoWidth, mVideoHeight);
+        } else {
+            showToast("没有弹窗权限，无法正常显示摄像头预览。");
+        }
+    }
+
+    private void dismissFloatView() {
+        if (mFloatWindowService == null) {
+            return;
+        }
+        mFloatWindowService.dismissSurfaceView();
+        ViewGroup viewGroup = (ViewGroup) mPreviewView.getParent();
+        if(viewGroup != null) {
+            viewGroup.removeView(mPreviewView);
+        }
+        mPreviewViewGroup.addView(mPreviewView, mPreviewLayoutParams);
+    }
+
+    private void bindFloatWindowService() {
+        if (mFloatWindowServiceConnection != null) {
+            return;
+        }
+        Intent intent = new Intent(this, FloatWindowService.class);
+        mFloatWindowServiceConnection = new ServiceConnection() {
+            @Override
+            public void onServiceConnected(ComponentName name, IBinder service) {
+                ALog.i(TAG, "FloatWindowService onServiceConnected...");
+                mFloatWindowService = ((FloatWindowService.FloatBinder)service).getService();
+            }
+
+            @Override
+            public void onServiceDisconnected(ComponentName name) {
+                ALog.i(TAG, "FloatWindowService onServiceDisconnected... : " + name);
+            }
+        };
+        bindService(intent, mFloatWindowServiceConnection , Context.BIND_AUTO_CREATE);
+    }
+
+    private void unbindFloatWindowService() {
+        if (mFloatWindowServiceConnection == null) {
+            return;
+        }
+        unbindService(mFloatWindowServiceConnection);
+        mFloatWindowServiceConnection = null;
+
+    }
+
+    @Override
+    public void onSensorChanged(SensorEvent event) {
+        if (event.sensor.getType() == Sensor.TYPE_ACCELEROMETER) {
+            float x = event.values[0];
+            float y = event.values[1];
+            float z = event.values[2];
+            if (Math.abs(x) > 3 || Math.abs(y) > 3) {
+                if (Math.abs(x) > Math.abs(y)) {
+                    mFURenderer.onDeviceOrientationChanged(x > 0 ? 0 : 180);
+                } else {
+                    mFURenderer.onDeviceOrientationChanged(y > 0 ? 90 : 270);
+                }
+            }
+        }
+    }
+
+    @Override
+    public void onAccuracyChanged(Sensor sensor, int accuracy) {
+
+    }
 }

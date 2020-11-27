@@ -1,11 +1,18 @@
 package com.chinanetcenter.streampusherdemo.filter;
 
+import android.content.Context;
 import android.util.Log;
 
 import com.chinanetcenter.StreamPusher.sdk.SPVideoFilter;
+import com.chinanetcenter.streampusherdemo.faceunity.profile.CSVUtils;
+import com.chinanetcenter.streampusherdemo.faceunity.profile.Constant;
 import com.faceunity.nama.FURenderer;
 
+import java.io.File;
 import java.nio.FloatBuffer;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Locale;
 
 /**
  * Faceunity 美颜贴纸
@@ -17,10 +24,14 @@ public class FaceUnityFilter extends SPVideoFilter {
     private FURenderer mFURenderer;
     private int mWidth;
     private int mHeight;
+    private CSVUtils mCSVUtils;
+    private Context mContext;
 
-    public FaceUnityFilter(FURenderer mFURenderer) {
+
+    public FaceUnityFilter(Context context, FURenderer mFURenderer) {
         super(null, null);
         this.mFURenderer = mFURenderer;
+        mContext = context;
     }
 
     @Override
@@ -28,6 +39,7 @@ public class FaceUnityFilter extends SPVideoFilter {
         super.onInit();
         Log.d(TAG, "onInit: ");
         mFURenderer.onSurfaceCreated();
+        initCsvUtil(mContext);
     }
 
     @Override
@@ -41,7 +53,10 @@ public class FaceUnityFilter extends SPVideoFilter {
     @Override
     public int onDrawFrame(int texId, FloatBuffer floatBuffer, FloatBuffer floatBuffer1) {
 //        Log.v(TAG, "onDrawFrame() called with: texId = [" + texId + "], thread:" + Thread.currentThread().getName() + ", egl:" + EGL14.eglGetCurrentContext());
+        long start = System.nanoTime();
         int fuTexId = mFURenderer.onDrawFrameSingleInput(texId, mWidth, mHeight);
+        long time = System.nanoTime() - start;
+        mCSVUtils.writeCsv(null, time);
         return super.onDrawFrame(fuTexId, floatBuffer, floatBuffer1);
     }
 
@@ -50,6 +65,23 @@ public class FaceUnityFilter extends SPVideoFilter {
         Log.d(TAG, "onDestroy: ");
         super.onDestroy();
         mFURenderer.onSurfaceDestroyed();
+        mCSVUtils.close();
+    }
+
+    private void initCsvUtil(Context context) {
+        mCSVUtils = new CSVUtils(context);
+        SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.getDefault());
+        String dateStrDir = format.format(new Date(System.currentTimeMillis()));
+        dateStrDir = dateStrDir.replaceAll("-", "").replaceAll("_", "");
+        SimpleDateFormat df = new SimpleDateFormat("yyyyMMddHHmmssSSS", Locale.getDefault());
+        String dateStrFile = df.format(new Date());
+        String filePath = Constant.filePath + dateStrDir + File.separator + "excel-" + dateStrFile + ".csv";
+        Log.d(TAG, "initLog: CSV file path:" + filePath);
+        StringBuilder headerInfo = new StringBuilder();
+        headerInfo.append("version：").append(FURenderer.getVersion()).append(CSVUtils.COMMA)
+                .append("机型：").append(android.os.Build.MANUFACTURER).append(android.os.Build.MODEL)
+                .append("处理方式：Texture").append(CSVUtils.COMMA);
+        mCSVUtils.initHeader(filePath, headerInfo);
     }
 
 }

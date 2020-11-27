@@ -5,15 +5,19 @@ import android.graphics.Bitmap;
 import android.os.Handler;
 import android.os.Looper;
 
-import com.bumptech.glide.DrawableTypeRequest;
 import com.bumptech.glide.Glide;
+import com.bumptech.glide.RequestBuilder;
+import com.bumptech.glide.load.DataSource;
 import com.bumptech.glide.load.engine.DiskCacheStrategy;
+import com.bumptech.glide.load.engine.GlideException;
 import com.bumptech.glide.request.RequestListener;
 import com.bumptech.glide.request.target.Target;
 import com.chinanetcenter.StreamPusher.sdk.SPStickerController;
 import com.chinanetcenter.StreamPusher.utils.ALog;
 
 import java.util.concurrent.atomic.AtomicInteger;
+
+import androidx.annotation.Nullable;
 
 /**
  * 一个实现了在图像中添加简单图片贴图的类<br/>
@@ -33,7 +37,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * 移动的实现方式是sdk每次回调onDrawSticker方法，我们在onDrawSticker方法中修改x和y的值，达到移动的效果。
  * </pre>
  */
-public class MoveStickerController extends SPStickerController implements RequestListener<Object, Bitmap> {
+public class MoveStickerController extends SPStickerController implements RequestListener<Bitmap> {
     private boolean mIsFirstFrame = true;
     private boolean mBmpUpdated = false;
     private boolean mPreviewBmpUpdated = false;
@@ -43,7 +47,7 @@ public class MoveStickerController extends SPStickerController implements Reques
      */
     private int loopCount = 200;
     private Context mAppContext;
-    private DrawableTypeRequest mDrawableTypeRequest = null;
+    private RequestBuilder<Bitmap> mDrawableTypeRequest = null;
     private Target mTarget;
     private int mDrawWidth,mDrawHeight;
     private Handler mMainHandler = new Handler(Looper.getMainLooper());
@@ -61,7 +65,7 @@ public class MoveStickerController extends SPStickerController implements Reques
      * @param resourceId
      */
     public void setDataSource(int resourceId) {
-        mDrawableTypeRequest = Glide.with(mAppContext).load(resourceId);
+        mDrawableTypeRequest = Glide.with(mAppContext).asBitmap().load(resourceId);
     }
 
     /**
@@ -69,7 +73,7 @@ public class MoveStickerController extends SPStickerController implements Reques
      * @param url
      */
     public void setDataSource(String url) {
-        mDrawableTypeRequest = Glide.with(mAppContext).load(url);
+        mDrawableTypeRequest = Glide.with(mAppContext).asBitmap().load(url);
     }
 
     @Override
@@ -87,7 +91,7 @@ public class MoveStickerController extends SPStickerController implements Reques
             mDrawWidth = drawWidth;
             mDrawHeight = drawHeight;
             if(mDrawableTypeRequest != null) {
-                mTarget = mDrawableTypeRequest.asBitmap().diskCacheStrategy(DiskCacheStrategy.ALL).listener(this).fitCenter().into(Target.SIZE_ORIGINAL, Target.SIZE_ORIGINAL);
+                mTarget = mDrawableTypeRequest.diskCacheStrategy(DiskCacheStrategy.ALL).listener(this).fitCenter().submit(Target.SIZE_ORIGINAL, Target.SIZE_ORIGINAL);
                 mIsFirstFrame = false;
                 return false;
             } else if(stickerBmp != null) {
@@ -137,7 +141,9 @@ public class MoveStickerController extends SPStickerController implements Reques
             mMainHandler.post(new Runnable() {
                 @Override
                 public void run() {
-                    Glide.clear(target);
+                    if(target != null) {
+                        Glide.with(mAppContext).clear(target);
+                    }
                 }
             });
         }
@@ -160,7 +166,7 @@ public class MoveStickerController extends SPStickerController implements Reques
      * @return
      */
     @Override
-    public boolean onException(Exception e, Object model, Target<Bitmap> target, boolean isFirstResource) {
+    public boolean onLoadFailed(@Nullable GlideException e, Object model, Target<Bitmap> target, boolean isFirstResource) {
         stickerBmp = null;
         mBmpUpdated = true;
         mPreviewBmpUpdated = true;
@@ -172,12 +178,12 @@ public class MoveStickerController extends SPStickerController implements Reques
      * @param resource
      * @param model
      * @param target
-     * @param isFromMemoryCache
+     * @param dataSource
      * @param isFirstResource
      * @return
      */
     @Override
-    public boolean onResourceReady(Bitmap resource, Object model, Target<Bitmap> target, boolean isFromMemoryCache, boolean isFirstResource) {
+    public boolean onResourceReady(Bitmap resource, Object model, Target<Bitmap> target, DataSource dataSource, boolean isFirstResource) {
         stickerBmp = resource;
         mBmpUpdated = true;
         mPreviewBmpUpdated = true;
