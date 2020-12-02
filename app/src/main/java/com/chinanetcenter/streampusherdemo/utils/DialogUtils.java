@@ -1,20 +1,8 @@
 package com.chinanetcenter.streampusherdemo.utils;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-
-import com.chinanetcenter.StreamPusher.sdk.SPManager;
-import com.chinanetcenter.StreamPusher.sdk.SPVideoFilter;
-import com.chinanetcenter.streampusherdemo.R;
-import com.chinanetcenter.streampusherdemo.filter.VideoFilterDemo1;
-import com.chinanetcenter.streampusherdemo.filter.VideoFilterDemo2;
-import com.chinanetcenter.streampusherdemo.filter.VideoFilterDemo3;
-
-import android.app.Activity;
+import android.app.ActionBar.LayoutParams;
 import android.app.AlertDialog;
 import android.app.Dialog;
-import android.app.ActionBar.LayoutParams;
 import android.app.ProgressDialog;
 import android.content.Context;
 import android.content.DialogInterface;
@@ -27,6 +15,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.inputmethod.EditorInfo;
 import android.widget.AdapterView;
+import android.widget.AdapterView.OnItemSelectedListener;
 import android.widget.ArrayAdapter;
 import android.widget.EditText;
 import android.widget.FrameLayout;
@@ -35,13 +24,28 @@ import android.widget.ScrollView;
 import android.widget.SeekBar;
 import android.widget.Spinner;
 import android.widget.TextView;
-import android.widget.AdapterView.OnItemSelectedListener;
 import android.widget.Toast;
+
+import com.chinanetcenter.StreamPusher.sdk.SPManager;
+import com.chinanetcenter.StreamPusher.sdk.SPVideoFilter;
+import com.chinanetcenter.streampusherdemo.R;
+import com.chinanetcenter.streampusherdemo.filter.VideoFilterDemo1;
+import com.chinanetcenter.streampusherdemo.filter.VideoFilterDemo2;
+import com.chinanetcenter.streampusherdemo.filter.VideoFilterDemo3;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+
+import androidx.fragment.app.FragmentActivity;
+import androidx.lifecycle.Lifecycle;
+import androidx.lifecycle.LifecycleObserver;
+import androidx.lifecycle.OnLifecycleEvent;
 
 public class DialogUtils {
 
-    public static interface InputConfigClickListener {
-        public void onResult(DialogInterface dialog, HashMap<String, String> result);
+    public interface InputConfigClickListener {
+        void onResult(DialogInterface dialog, HashMap<String, String> result);
     }
 
     /**
@@ -53,7 +57,7 @@ public class DialogUtils {
      * @param configResultListhener
      * @return
      */
-    public static Dialog showConfigInputDialog(final Context context,int inputType, final String[] keys, String[] defaultValues, String[] promptStrings, final InputConfigClickListener configResultListhener) {
+    public static Dialog showConfigInputDialog(final Context context, int inputType, final String[] keys, String[] defaultValues, String[] promptStrings, final InputConfigClickListener configResultListhener) {
         if (keys == null || keys.length == 0)
             return null;
 
@@ -190,7 +194,7 @@ public class DialogUtils {
         dialog.setMessage(message);
         if (cancelable) {
             dialog.setButton(ProgressDialog.BUTTON_NEGATIVE, cancleStr, new OnClickListener() {
-                
+
                 @Override
                 public void onClick(DialogInterface dialog, int which) {
                     dialog.cancel();
@@ -220,7 +224,7 @@ public class DialogUtils {
         alertDialog.show();
         return alertDialog;
     }
-    
+
     public static Dialog showMultiChoiceDialog(Context context, String title, CharSequence[] Items, boolean[] checkedItem, final DialogInterface.OnMultiChoiceClickListener onMultiClickListener, final DialogInterface.OnClickListener onClickListener) {
         if (context == null)
             return null;
@@ -308,7 +312,7 @@ public class DialogUtils {
         return dialog;
     }
     
-    public static Dialog showVolumeAdjustDialog(Context context, int micProgress, int bgmProgress ,SeekBar.OnSeekBarChangeListener listerner) {
+    public static Dialog showVolumeAdjustDialog(Context context, int micProgress, int bgmProgress , SeekBar.OnSeekBarChangeListener listerner) {
         LayoutInflater inflater = (LayoutInflater) context.getSystemService(Context.LAYOUT_INFLATER_SERVICE);
         View rootView = inflater.inflate(R.layout.bgm_volume_dialog_item, null);
         AlertDialog.Builder builder = new AlertDialog.Builder(context);
@@ -325,17 +329,38 @@ public class DialogUtils {
         dialog.show();
         return dialog;
     }
-    
-    public static SPManager.FilterType mCurrentFilter = SPManager.FilterType.NONE;
-    public static int mCurrenStyleFilter = 0;
-    public static int mCurrenCustomFilter = 0;
-    public static int mStyleLevel = 5;
 
-    public static Dialog showBeautyPickDialog(final Activity context) {
+    private static SPManager.FilterType mCurrentFilter = SPManager.FilterType.NONE;
+    private static int mCurrenStyleFilter = 0;
+    private static int mCurrenCustomFilter = 0;
+    private static int mStyleLevel = 5;
+    private static LifecycleObserver beautyDialogLifecycleObserver;
+
+    public static Dialog showBeautyPickDialog(final FragmentActivity context) {
+        if(beautyDialogLifecycleObserver == null) {
+            beautyDialogLifecycleObserver = new LifecycleObserver() {
+
+                @OnLifecycleEvent(Lifecycle.Event.ON_CREATE)
+                protected void onCreate() {
+                    //将DialogUtils中记录的标志位置为默认
+                    mCurrenStyleFilter = 0;
+                    mCurrenCustomFilter = 0;
+                }
+
+                @OnLifecycleEvent(Lifecycle.Event.ON_DESTROY)
+                protected void onDestroy() {
+                    beautyDialogLifecycleObserver = null;
+                }
+
+            };
+            context.getLifecycle().addObserver(beautyDialogLifecycleObserver);
+        }
+
         if(mCurrenCustomFilter == 3) {
             CommonUtils.showThirdPartFilterDialog(context);
             return null;
         }
+
         mCurrentFilter = SPManager.getPushState().filter;
         AlertDialog.Builder builder = new AlertDialog.Builder(context, R.style.Translucent_Diglog);
         LayoutInflater inflater = (LayoutInflater) context.getSystemService(Context.LAYOUT_INFLATER_SERVICE);
@@ -443,14 +468,12 @@ public class DialogUtils {
                                 filters.add(new VideoFilterDemo3());
                                 SPManager.setFilter(filters);
                                 break;
-                            case 3://商汤滤镜 or faceu滤镜
+                            case 3://faceu滤镜
                                 dialog.dismiss();
                                 CommonUtils.showThirdPartFilterDialog(context);
                                 break;
                         }
-                        if(pos != 3) {
-                            mCurrenCustomFilter = pos;
-                        }
+                        mCurrenCustomFilter = pos;
                         break;
 
                     default:
@@ -480,9 +503,7 @@ public class DialogUtils {
         nameList.add("无");//0
         nameList.add("滤镜");//1
         nameList.add("滤镜组");//2
-        if(Config.getVersion() == Config.VERSION_SENSE){
-            nameList.add("商汤滤镜");//3
-        }else if(Config.getVersion() == Config.VERSION_FACEU) {
+       if(Config.getVersion() == Config.VERSION_FACEU) {
             nameList.add("faceu滤镜");//3
         }
         customFilterSpinner.setAdapter(new ArrayAdapter<Object>(context, android.R.layout.simple_spinner_dropdown_item, nameList.toArray()));

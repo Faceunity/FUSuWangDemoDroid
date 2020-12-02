@@ -1,16 +1,16 @@
 package com.chinanetcenter.streampusherdemo.adapter;
 
-import java.util.List;
-
-import com.chinanetcenter.streampusherdemo.R;
-import com.chinanetcenter.streampusherdemo.object.SettingItem;
-
 import android.content.Context;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
 import android.widget.TextView;
+
+import com.chinanetcenter.streampusherdemo.R;
+import com.chinanetcenter.streampusherdemo.object.SettingItem;
+
+import java.util.List;
 
 public class SettingsAdapter extends ArrayAdapter<SettingItem> {
     LayoutInflater mInflater;

@@ -4,5 +4,9 @@
     <string name="app_name">网宿推流</string>
     <string name="hello_world">Hello world!</string>
     <string name="action_settings">Settings</string>
-
+    <string name="toast_permission">请授予必要的权限！</string>
+    <string name="camera_dialog_title">警告</string>
+    <string name="camera_dialog_message">相机权限被禁用或者相机正在被占用！</string>
+    <string name="camera_dialog_open">重试</string>
+    <string name="camera_dialog_back">退出</string>
 </resources>

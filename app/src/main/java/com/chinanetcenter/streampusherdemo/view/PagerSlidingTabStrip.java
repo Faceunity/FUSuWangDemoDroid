@@ -10,8 +10,6 @@ import android.graphics.Typeface;
 import android.os.Build;
 import android.os.Parcel;
 import android.os.Parcelable;
-import android.support.v4.view.ViewPager;
-import android.support.v4.view.ViewPager.OnPageChangeListener;
 import android.util.AttributeSet;
 import android.util.DisplayMetrics;
 import android.util.TypedValue;
@@ -23,9 +21,11 @@ import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import com.chinanetcenter.streampusherdemo.R;
+
 import java.util.Locale;
 
-import com.chinanetcenter.streampusherdemo.R;
+import androidx.viewpager.widget.ViewPager;
 
 public class PagerSlidingTabStrip extends HorizontalScrollView {
 
@@ -41,7 +41,7 @@ public class PagerSlidingTabStrip extends HorizontalScrollView {
     private LinearLayout.LayoutParams expandedTabLayoutParams;
 
     private final PageListener pageListener = new PageListener();
-    public OnPageChangeListener delegatePageListener;
+    public ViewPager.OnPageChangeListener delegatePageListener;
 
     private LinearLayout tabsContainer;
     private ViewPager pager;
@@ -163,7 +163,7 @@ public class PagerSlidingTabStrip extends HorizontalScrollView {
         notifyDataSetChanged();
     }
 
-    public void setOnPageChangeListener(OnPageChangeListener listener) {
+    public void setOnPageChangeListener(ViewPager.OnPageChangeListener listener) {
         this.delegatePageListener = listener;
     }
 
@@ -333,7 +333,7 @@ public class PagerSlidingTabStrip extends HorizontalScrollView {
         }
     }
 
-    private class PageListener implements OnPageChangeListener {
+    private class PageListener implements ViewPager.OnPageChangeListener {
 
         @Override
         public void onPageScrolled(int position, float positionOffset, int positionOffsetPixels) {

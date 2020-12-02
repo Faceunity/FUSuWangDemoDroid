@@ -1,25 +1,22 @@
 package com.chinanetcenter.streampusherdemo.view;
 
-import java.io.File;
-import java.util.ArrayList;
-import java.util.List;
-
 import android.Manifest;
 import android.app.DialogFragment;
 import android.app.LoaderManager.LoaderCallbacks;
+import android.content.ContentUris;
 import android.content.Context;
 import android.content.CursorLoader;
 import android.content.DialogInterface;
 import android.content.Loader;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
+import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
 import android.provider.MediaStore;
-import android.support.annotation.Nullable;
-import android.support.v4.content.PermissionChecker;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -36,6 +33,13 @@ import android.widget.Toast;
 
 import com.chinanetcenter.StreamPusher.sdk.SPAudioPlayer;
 import com.chinanetcenter.streampusherdemo.R;
+
+import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
+
+import androidx.annotation.Nullable;
+import androidx.core.content.PermissionChecker;
 
 public class MusicPickDialog extends DialogFragment implements View.OnClickListener, DialogInterface, LoaderCallbacks<Cursor>, OnItemClickListener, SeekBar.OnSeekBarChangeListener {
     
@@ -128,17 +132,9 @@ public class MusicPickDialog extends DialogFragment implements View.OnClickListe
         mPositiveBtn.setOnClickListener(this);
         mEmptyView = rootView.findViewById(android.R.id.empty);
         mLoadingView = rootView.findViewById(R.id.loading_container);
-        int result = PermissionChecker.checkCallingOrSelfPermission(getActivity(), Manifest.permission.READ_EXTERNAL_STORAGE);
-        if (result != PackageManager.PERMISSION_GRANTED) {
-            mLoadingView.setVisibility(View.GONE);
-            mMusicList.clear();
-            mEmptyView.setVisibility(View.VISIBLE);
-            Toast.makeText(getActivity(), "SD卡权限拒绝，读取音乐列表失败！", Toast.LENGTH_SHORT).show();
-            return rootView;
-        }
         if(mMusicList.isEmpty()) {
             mMusicList.clear();
-            File musicFile = new File("/sdcard/StreamPusherMusic");//优先显示测试文件夹内的歌曲
+            File musicFile = new File(getActivity().getExternalFilesDir(Environment.DIRECTORY_MUSIC), "StreamPusherMusic");//优先显示测试文件夹内的歌曲
             if(musicFile.exists() && musicFile.isDirectory()){
                 File[] musicFiles = musicFile.listFiles();
                 for(int i = 0; musicFiles != null && i< musicFiles.length; i++){
@@ -147,7 +143,7 @@ public class MusicPickDialog extends DialogFragment implements View.OnClickListe
                     item.musicFilePath = musicFiles[i].getAbsolutePath();
                     item.musicTitle = musicFiles[i].getName();
                     mMusicList.add(item);
-                }                
+                }
             }
             if(mMusicList.size() > 0){
                 mLoadingView.setVisibility(View.GONE);
@@ -155,6 +151,14 @@ public class MusicPickDialog extends DialogFragment implements View.OnClickListe
                 mListView.setVisibility(View.VISIBLE);
                 mProgressGroup.setVisibility(View.VISIBLE);
             } else {
+                int result = PermissionChecker.checkCallingOrSelfPermission(getActivity(), Manifest.permission.READ_EXTERNAL_STORAGE);
+                if (result != PackageManager.PERMISSION_GRANTED) {
+                    mLoadingView.setVisibility(View.GONE);
+                    mMusicList.clear();
+                    mEmptyView.setVisibility(View.VISIBLE);
+                    Toast.makeText(getActivity(), "SD卡权限拒绝，读取音乐列表失败！", Toast.LENGTH_SHORT).show();
+                    return rootView;
+                }
                 getLoaderManager().initLoader(0, null, this);
             }
         } else {
@@ -220,9 +224,10 @@ public class MusicPickDialog extends DialogFragment implements View.OnClickListe
 
     @Override
     public Loader<Cursor> onCreateLoader(int id, Bundle args) {
-        String projection[] = new String[]{MediaStore.Audio.AudioColumns.DATA,
-                                          MediaStore.Audio.AudioColumns.TITLE,
-                                          };
+        String projection[] = new String[]{
+                MediaStore.Audio.AudioColumns.DATA
+                , MediaStore.Audio.AudioColumns.TITLE
+                , MediaStore.Audio.Media._ID};
         return new CursorLoader(getActivity(),
                                 MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
                                 projection,
@@ -244,7 +249,13 @@ public class MusicPickDialog extends DialogFragment implements View.OnClickListe
         while (data.moveToNext()) {
             MusicItem item = new MusicItem();
             item.checked = false;
-            item.musicFilePath = data.getString(data.getColumnIndex(MediaStore.Audio.AudioColumns.DATA));
+            //适配android 10，使用ContentProvider加载歌曲，直接使用文件路径加载会提示文件无访问权限
+            if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                int id = data.getInt(data.getColumnIndex(MediaStore.Audio.Media._ID));
+                item.musicFilePath = ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, id).toString();
+            } else {
+                item.musicFilePath = data.getString(data.getColumnIndex(MediaStore.Audio.AudioColumns.DATA));
+            }
             item.musicTitle = data.getString(data.getColumnIndex(MediaStore.Audio.AudioColumns.TITLE));
             mMusicList.add(item);
         }

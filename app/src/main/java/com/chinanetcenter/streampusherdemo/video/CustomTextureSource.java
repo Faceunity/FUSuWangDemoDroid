@@ -1,6 +1,5 @@
 package com.chinanetcenter.streampusherdemo.video;
 
-import android.annotation.SuppressLint;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
@@ -13,7 +12,6 @@ import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Message;
 import android.os.SystemClock;
-import android.util.Log;
 import android.view.SurfaceHolder;
 
 import com.chinanetcenter.StreamPusher.sdk.SPManager;
@@ -95,6 +93,7 @@ public class CustomTextureSource {
     private long mLastUpdateTime = 0;
 
 
+
     public CustomTextureSource(int videoWidth, int videoHeight) {
         mVideoWidth = videoWidth;
         mVideoHeight = videoHeight;
@@ -110,7 +109,7 @@ public class CustomTextureSource {
             public boolean handleMessage(Message msg) {
                 switch (msg.what) {
                     case MSG_REQUEST_RENDER:
-                        if (mSurfaceView != null) {
+                        if(mSurfaceView != null) {
                             mSurfaceView.requestRender();
                         }
                         mHandler.sendEmptyMessageDelayed(MSG_REQUEST_RENDER, 1000 / FRAME_RATE);
@@ -166,7 +165,7 @@ public class CustomTextureSource {
                             }
                             //释放图片资源
                             mBitmapUpdated = false;
-                            if (mBitmap != null) {
+                            if(mBitmap != null) {
                                 mBitmap.recycle();
                                 mBitmap = null;
                             }
@@ -193,7 +192,6 @@ public class CustomTextureSource {
         glSurfaceView.setRenderMode(GLSurfaceView.RENDERMODE_WHEN_DIRTY);
     }
 
-    @SuppressLint("WrongConstant")
     private void refreshBitmap() {
         if (mBitmap == null) {
             mBitmap = Bitmap.createBitmap(mVideoWidth, mVideoHeight, Bitmap.Config.ARGB_8888);
@@ -215,7 +213,7 @@ public class CustomTextureSource {
         mCanvas.drawText(timeStr, (mVideoWidth - textWidth) / 2, mVideoHeight / 2, mPaint);
         mPaint.setColor(Color.GRAY);
         mPaint.setTextSize(TEXT_SIZE_FRAM_RATE);
-        String frameRateStr = "绘制帧率：" + String.format("%02d", mFrameRate);
+        String frameRateStr = "绘制帧率：" + String.format("%02d",mFrameRate);
         textWidth = mPaint.measureText(frameRateStr);
         mCanvas.drawText(frameRateStr, (mVideoWidth - textWidth) / 2, mVideoHeight / 4, mPaint);
         mBitmapUpdated = true;
@@ -253,6 +251,7 @@ public class CustomTextureSource {
             Matrix.setLookAtM(mViewMatrix, 0, 0, 0, 5.0f, 0f, 0f, 0f, 0f, 1.0f, 0.0f);
             //计算变换矩阵
             Matrix.multiplyMM(mMVPMatrix, 0, mProjectMatrix, 0, mViewMatrix, 0);
+
         }
 
         @Override
@@ -262,7 +261,7 @@ public class CustomTextureSource {
              * 这里为了减少MainActivity的代码量，环境的销毁放在了SurfaceHolder.Callback的surfaceDestroyed方法中，
              * 这样资源的释放可以由Surface的生命周期控制。
              */
-            if (!mEGLCreated) {
+            if(!mEGLCreated) {
                 //初始化异步线程，不断刷新纹理贴图和界面绘制
                 if (mHandlerThread == null) {
                     mHandlerThread = new HandlerThread(TAG);
@@ -284,7 +283,7 @@ public class CustomTextureSource {
                 mEGLCreated = true;
             }
 
-            if (mBitmapUpdated) {//图片更新后重新加载贴图
+            if(mBitmapUpdated) {//图片更新后重新加载贴图
                 mTimeTextureID = OpenglUtil.loadTexture(mBitmap, mTimeTextureID[0], false);
                 mBitmapUpdated = false;
             }

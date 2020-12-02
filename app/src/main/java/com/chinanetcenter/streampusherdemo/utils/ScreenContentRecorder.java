@@ -1,11 +1,6 @@
 package com.chinanetcenter.streampusherdemo.utils;
 
-import com.chinanetcenter.StreamPusher.sdk.SPScreenShot;
-import com.chinanetcenter.StreamPusher.sdk.SPSurfaceView;
-import com.chinanetcenter.StreamPusher.utils.ALog;
-import com.chinanetcenter.streampusherdemo.R;
-
-import android.content.Context;
+import android.app.Activity;
 import android.content.DialogInterface;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
@@ -19,17 +14,22 @@ import android.view.View;
 import android.view.View.MeasureSpec;
 import android.widget.Toast;
 
+import com.chinanetcenter.StreamPusher.sdk.SPScreenShot;
+import com.chinanetcenter.StreamPusher.sdk.SPSurfaceView;
+import com.chinanetcenter.StreamPusher.utils.ALog;
+import com.chinanetcenter.streampusherdemo.R;
+import com.chinanetcenter.streampusherdemo.service.FloatWindowService;
+
 public class ScreenContentRecorder {
     private static final String TAG = "ScreenContentRecorder";
-    private Context mContext = null;
+    private FloatWindowService mService;
+    private Activity mActivity;
     private Handler mUiHandler = null;
     private Thread mSurfaceShotThread = null;
 
-    public ScreenContentRecorder(Context context) {
-        if (context == null) {
-            throw new IllegalArgumentException("Context must not be null");
-        }
-        mContext = context;
+    public ScreenContentRecorder(Activity activity, FloatWindowService service) {
+        mActivity = activity;
+        mService = service;
         mUiHandler = new Handler(Looper.getMainLooper());
     }
     
@@ -38,7 +38,7 @@ public class ScreenContentRecorder {
             takeSurfaceShotAsync(surfaceView, contentView);
             return;
         }
-        DialogUtils.showSingleChoiceDialog(mContext, "请选择截屏方式", new String[] { "全屏截屏", "视图截屏" }, -1, new DialogInterface.OnClickListener() {
+        DialogUtils.showSingleChoiceDialog(mActivity, "请选择截屏方式", new String[] { "全屏截屏", "视图截屏" }, -1, new DialogInterface.OnClickListener() {
 
             @Override
             public void onClick(DialogInterface dialog, int which) {
@@ -49,7 +49,7 @@ public class ScreenContentRecorder {
                         public void run() {
                             takeFullScreenShot();
                         }
-                    }, 200);//做个延时，防止截图截到菜单窗口,菜单窗口的关闭动画是150ms
+                    }, 200);
                     break;
                 case 1:
                     takeSurfaceShotAsync(surfaceView, contentView);
@@ -63,9 +63,7 @@ public class ScreenContentRecorder {
     }
 
     public void takeFullScreenShot() {
-        SPScreenShot shotter = new SPScreenShot(mContext);
-        shotter.takeGlobalScreenShot();
-        Log.i(TAG, " take screenshot start : " + System.currentTimeMillis());
+        SPScreenShot shotter = new SPScreenShot(mActivity.getApplicationContext());
         shotter.setScreenShotListener(new SPScreenShot.ScreenCaptureListener() {
             @Override
             public void onScreenCaptured(final Bitmap bitmap) {
@@ -74,7 +72,7 @@ public class ScreenContentRecorder {
                     @Override
                     public void run() {
                         // 截屏动画,必须在ui线程执行
-                        ScreenShotAnimationExcutor excutor = new ScreenShotAnimationExcutor(mContext);
+                        ScreenShotAnimationExcutor excutor = new ScreenShotAnimationExcutor(mActivity);
                         excutor.excuteFullScreenAnimation(bitmap);
 
                     }
@@ -89,12 +87,23 @@ public class ScreenContentRecorder {
             @Override
             public void onScreenCaptureFinish() {
                 Log.i(TAG, " take screenshot onScreenCaptureFinish : " + System.currentTimeMillis());
+                mService.cancleScreenShotNotification();
             }
 
             @Override
-            public void onScreenCaptureError(int errorCode, String errorDetail) {
+            public void onScreenCaptureError(final int errorCode, final String errorDetail) {
+                mService.cancleScreenShotNotification();
+                mActivity.runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        Toast.makeText(mActivity, "截屏失败(" + errorCode + "): " + errorDetail, Toast.LENGTH_SHORT).show();
+                    }
+                });
             }
         });
+        mService.showScreenShotNotification();
+        shotter.takeGlobalScreenShot();
+        Log.i(TAG, " take screenshot start : " + System.currentTimeMillis());
     }
     
     public void takeSurfaceShotAsync(final SPSurfaceView surfaceView, final View contentView) {
@@ -144,10 +153,10 @@ public class ScreenContentRecorder {
                     public void run() {
                         if (finalBitmapCaptured != null) {
                             // 截屏动画,必须在ui线程执行
-                            ScreenShotAnimationExcutor excutor = new ScreenShotAnimationExcutor(mContext);
+                            ScreenShotAnimationExcutor excutor = new ScreenShotAnimationExcutor(mActivity);
                             excutor.excuteFullScreenAnimation(finalBitmapCaptured);
                         } else {
-                            Toast.makeText(mContext, "截屏失败，未截取到任何数据", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(mActivity, "截屏失败，未截取到任何数据", Toast.LENGTH_SHORT).show();
                         }
                         mSurfaceShotThread = null;
                     }

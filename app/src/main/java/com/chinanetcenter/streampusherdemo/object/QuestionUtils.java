@@ -1,6 +1,7 @@
 package com.chinanetcenter.streampusherdemo.object;
 
 import android.content.Context;
+import android.os.Environment;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -15,7 +16,7 @@ public class QuestionUtils {
     public static QuestionGroup loadTestQuestions(Context context) {
         if (context == null)
             return null;
-        File sdcardFile = new File("/sdcard/questions");
+        File sdcardFile = new File(context.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS), "questions");
 
         InputStream inputStream = null;
         QuestionGroup questions = null;

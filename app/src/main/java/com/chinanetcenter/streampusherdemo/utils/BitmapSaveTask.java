@@ -1,12 +1,5 @@
 package com.chinanetcenter.streampusherdemo.utils;
 
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.text.SimpleDateFormat;
-import java.util.Date;
-
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
@@ -14,6 +7,13 @@ import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Environment;
 import android.util.Log;
+
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 
 public class BitmapSaveTask extends AsyncTask<Bitmap, Void, Bitmap> {
     private Context mContext = null;
@@ -38,9 +38,9 @@ public class BitmapSaveTask extends AsyncTask<Bitmap, Void, Bitmap> {
       String filePath = null;
       if (Environment.MEDIA_MOUNTED.equals(Environment.getExternalStorageState()) || !Environment.isExternalStorageRemovable())
       {
-          File root = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES);
+          File root = mContext.getExternalFilesDir(Environment.DIRECTORY_PICTURES);
           if (root != null) {
-              File destDir = new File(root, "/网宿推流/");
+              File destDir = new File(root, "/screen/");
               if(!destDir.exists()) {
                   if(!destDir.mkdir()) {
                       Log.e("BitmapSaveTask", "the dirName : " + destDir + " create failure" );

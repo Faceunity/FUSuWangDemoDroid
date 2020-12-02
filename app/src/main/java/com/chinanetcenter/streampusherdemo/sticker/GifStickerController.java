@@ -8,22 +8,16 @@ import android.graphics.PorterDuff;
 import android.graphics.drawable.Drawable;
 import android.os.Handler;
 import android.os.Looper;
-import android.support.annotation.NonNull;
 
-import com.bumptech.glide.DrawableTypeRequest;
-import com.bumptech.glide.Glide;
-import com.bumptech.glide.gifdecoder.GifDecoder;
-import com.bumptech.glide.load.engine.DiskCacheStrategy;
-import com.bumptech.glide.load.resource.drawable.GlideDrawable;
-import com.bumptech.glide.load.resource.gif.GifDrawable;
-import com.bumptech.glide.request.RequestListener;
-import com.bumptech.glide.request.target.Target;
 import com.chinanetcenter.StreamPusher.sdk.SPStickerController;
 import com.chinanetcenter.StreamPusher.utils.ALog;
 
+import java.io.IOException;
 import java.util.LinkedList;
-import java.util.Queue;
 import java.util.concurrent.atomic.AtomicInteger;
+
+import androidx.annotation.NonNull;
+import pl.droidsonroids.gif.GifDrawable;
 
 /**
  * 向画面中提供一个gif图像的控制器<br/>
@@ -45,23 +39,21 @@ import java.util.concurrent.atomic.AtomicInteger;
  * 通过invalidateDrawable不断更新图片资源。
  * </pre>
  */
-public class GifStickerController extends SPStickerController implements RequestListener<Object, GifDrawable>, Drawable.Callback {
+public class GifStickerController extends SPStickerController implements Drawable.Callback {
 
     private static final String TAG = "GifStickerController";
     /**
      * 无限循环
      */
-    public static final int LOOP_FOREVER = GlideDrawable.LOOP_FOREVER;
+    public static final int LOOP_FOREVER = 0;
     /**
      * gif内置播放次数
      */
-    public static final int LOOP_INTRINSIC = GlideDrawable.LOOP_INTRINSIC;
+    public static final int LOOP_INTRINSIC = -1;
     private boolean mIsFirstFrame = true;
     private boolean mBmpUpdated = false;
     private boolean mPreviewBmpUpdated = false;
     private Context mAppContext;
-    private DrawableTypeRequest mDrawableTypeRequest = null;
-    private Target mTarget;
     private int mDrawWidth,mDrawHeight;
     private int mLoopCount = 0;
     private int mMaxLoopCount = LOOP_FOREVER;
@@ -71,8 +63,8 @@ public class GifStickerController extends SPStickerController implements Request
     /**
      * 配合复写{@link #getSticker(boolean, SPStickerController.DrawStickerType)}，缓存一张图片，防止因不停创建图片导致不断gc
      */
-    private Queue<Bitmap> mDecodeBitmapPool = new LinkedList<>();
-    private boolean mBitmapPoolCleared = true;
+    private Object mDecodeBitmapLock = new LinkedList<>();
+    private Bitmap mDecodeBitmap;
     private AtomicInteger mControllerRefCount = new AtomicInteger();
 
     public GifStickerController(Context context) {
@@ -85,15 +77,17 @@ public class GifStickerController extends SPStickerController implements Request
      * @param resourceId
      */
     public void setDataSource(int resourceId) {
-        mDrawableTypeRequest = Glide.with(mAppContext).load(resourceId);
-    }
-
-    /**
-     * 设置数据源，该数据源会在第一帧画面到来时加载
-     * @param url
-     */
-    public void setDataSource(String url) {
-        mDrawableTypeRequest = Glide.with(mAppContext).load(url);
+        try {
+            mGifDrawable = new GifDrawable(mAppContext.getResources(), resourceId);
+            if(mGifFinishListener != null) {
+                mGifFinishListener.onGifLoadSuccess(this);
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+            if(mGifFinishListener != null) {
+                mGifFinishListener.onGifLoadError(this, e.getMessage());
+            }
+        }
     }
 
     /**
@@ -123,16 +117,14 @@ public class GifStickerController extends SPStickerController implements Request
     @Override
     public boolean onDrawSticker(int drawWidth, int drawHeight, boolean mirror, DrawStickerType type) {
         if(mIsFirstFrame) {
-            synchronized (mDecodeBitmapPool) {
-                mBitmapPoolCleared = false;
-            }
             mDrawWidth = drawWidth;
             mDrawHeight = drawHeight;
-            if(mDrawableTypeRequest != null) {
-                mTarget = mDrawableTypeRequest.asGif().skipMemoryCache(false).diskCacheStrategy(DiskCacheStrategy.NONE).dontAnimate().listener(this).into(Target.SIZE_ORIGINAL, Target.SIZE_ORIGINAL);
-                mIsFirstFrame = false;
+            if(mGifDrawable == null) {
                 return false;
-            } else if(stickerBmp != null) {
+            } else {
+                startGif(mGifDrawable);
+            }
+            if(stickerBmp != null) {
                 mBmpUpdated = true;
                 mPreviewBmpUpdated = true;
                 updateStickerBmpAndSize();
@@ -160,34 +152,16 @@ public class GifStickerController extends SPStickerController implements Request
         mBmpUpdated = false;
         mPreviewBmpUpdated = false;
         //清空缓存图像
-        synchronized (mDecodeBitmapPool) {
-            for(Bitmap bitmap : mDecodeBitmapPool) {
-                bitmap.recycle();
+        synchronized (mDecodeBitmapLock) {
+            if(mDecodeBitmap != null) {
+                mDecodeBitmap.recycle();
+                mDecodeBitmap = null;
             }
-            mDecodeBitmapPool.clear();
-            mBitmapPoolCleared = true;
             stickerBmp = null;
         }
-        if (mTarget != null) {
-            final Target target = mTarget;
-            mTarget = null;
-            mMainHandler.post(new Runnable() {
-                @Override
-                public void run() {
-                    if(mGifDrawable != null) {
-                        mGifDrawable.stop();
-                        mGifDrawable.recycle();
-                    }
-                    Glide.clear(target);
-                    try {
-                        //释放gif占用的缓存空间
-                        Glide.get(mAppContext).clearMemory();
-                    }catch (Exception e) {
-                        ALog.e(TAG, "clear gif memory cache failed!");
-                    }
-
-                }
-            });
+        if (mGifDrawable != null) {
+            mGifDrawable.recycle();
+            mGifDrawable = null;
         }
     }
 
@@ -199,64 +173,33 @@ public class GifStickerController extends SPStickerController implements Request
      */
     @Override
     public synchronized Bitmap getSticker(boolean mirror, DrawStickerType type){
-        if(!mirror) {
-            synchronized (mDecodeBitmapPool) {
-                if(stickerBmp != null) {
-                    mDecodeBitmapPool.offer(stickerBmp);
-                }
-                stickerBmp = mDecodeBitmapPool.poll();
+        if(type != DrawStickerType.PRIVIEW ) {
+            synchronized (mDecodeBitmapLock) {
+                Bitmap temp = stickerBmp;
+                stickerBmp = mDecodeBitmap;
+                mDecodeBitmap = temp;
             }
         }
         return stickerBmp;
     }
 
-    /**
-     * 加载图像失败后回调此方法
-     * @param e
-     * @param model
-     * @param target
-     * @param isFirstResource
-     * @return
-     */
-    @Override
-    public boolean onException(Exception e, Object model, Target<GifDrawable> target, boolean isFirstResource) {
-        stickerBmp = null;
-        mBmpUpdated = true;
-        mPreviewBmpUpdated = true;
-        if(mGifFinishListener != null) {
-            mGifFinishListener.onGifLoadError(this);
+    public void  startGif(GifDrawable resource) {
+        ALog.i(TAG, "GifDrawable Resource Ready");
+        synchronized (mDecodeBitmapLock) {
+            //获取首帧图像
+            stickerBmp = resource.getCurrentFrame();
+            mDecodeBitmap = null;
         }
-        return false;
-    }
-
-    /**
-     * gif 资源加载成功回调，在此方法中启动gif播放
-     * @param resource
-     * @param model
-     * @param target
-     * @param isFromMemoryCache
-     * @param isFirstResource
-     * @return
-     */
-    @Override
-    public boolean onResourceReady(GifDrawable resource, Object model, Target<GifDrawable> target, boolean isFromMemoryCache, boolean isFirstResource) {
-        if(mGifFinishListener != null) {
-            mGifFinishListener.onGifLoadSuccess(this);
-        }
-        //mTarget为null，证明该controller已经被销毁，忽略此次加载结果
-        if(mTarget == null) return true;
-        //获取首帧图像
-        stickerBmp = resource.getFirstFrame();
         //根据首帧图像宽高计算在controller的宽高，保持比例，防止图像被拉伸
         updateStickerBmpAndSize();
-        if(resource.getFrameCount() > 1) {
+        if(resource.getNumberOfFrames() > 1) {
             //首帧不需要在这里设置，invalidateDrawable方法还会绘制首帧
             stickerBmp = null;
             //设置GifDrawable全局引用，以便在onDestroy方法中停止gif播放，释放资源
             mGifDrawable = resource;
             //设置使用gif内置循环播放次数时，循环次数从解码器中获取
             if (mMaxLoopCount == LOOP_INTRINSIC) {
-                mMaxLoopCount = resource.getDecoder().getLoopCount();
+                mMaxLoopCount = mGifDrawable.getLoopCount();
                 //很多gif默认循环次数为0，这里将循环次数改为1，播放一次
                 if(mMaxLoopCount == 0) {
                     mMaxLoopCount = 1;
@@ -276,12 +219,8 @@ public class GifStickerController extends SPStickerController implements Request
             mBmpUpdated = true;
             mPreviewBmpUpdated = true;
         }
-        return false;
     }
 
-    /**
-     * 根据解码的图像和用户设置的宽高计算一个实际不拉伸图像的宽高
-     */
     protected void updateStickerBmpAndSize() {
         if(stickerBmp == null) return;
         int setWidth = (int) (this.width * mDrawWidth);
@@ -296,10 +235,6 @@ public class GifStickerController extends SPStickerController implements Request
         this.height = (float) fitHeight / mDrawHeight;
     }
 
-    /**
-     * Glide每解析一帧gif图像都会回调此方法，我们在此方法中通过{@link Drawable#draw(Canvas)}方法获取解码的图像；<br/>
-     * @param dr
-     */
     @Override
     public void invalidateDrawable(@NonNull Drawable dr) {
         if (dr != null && dr instanceof GifDrawable) {
@@ -307,12 +242,13 @@ public class GifStickerController extends SPStickerController implements Request
             // update cached drawable dimensions if they've changed
             final int w = gifDr.getIntrinsicWidth();
             final int h = gifDr.getIntrinsicHeight();
-            synchronized (mDecodeBitmapPool) {
-                if(mBitmapPoolCleared) {
+            synchronized (mDecodeBitmapLock) {
+                if(mGifDrawable == null) {
+                    //destroy回调后，引用被置null
                     return;
                 }
                 //当前贴纸图片为空，说明贴纸数据已经被加载到界面中，此时加载下一张贴纸图片
-                Bitmap bitmap = mDecodeBitmapPool.poll();
+                Bitmap bitmap = mDecodeBitmap;
                 boolean needCreateBitmap = false;
                 if(bitmap == null) {
                     needCreateBitmap = true;
@@ -328,13 +264,11 @@ public class GifStickerController extends SPStickerController implements Request
                 Canvas canvas = new Canvas(bitmap);
                 canvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR);
                 gifDr.draw(canvas);
-                mDecodeBitmapPool.offer(bitmap);
-                stickerBmp = bitmap;
+                mDecodeBitmap = bitmap;
                 mBmpUpdated = true;
                 mPreviewBmpUpdated = true;
             }
-            GifDecoder decoder = gifDr.getDecoder();
-            if (decoder.getCurrentFrameIndex() == decoder.getFrameCount() - 1) {
+            if (gifDr.getCurrentFrameIndex() == gifDr.getNumberOfFrames() - 1) {
                 mLoopCount++;
             }
             if (mMaxLoopCount != LOOP_FOREVER && mLoopCount >= mMaxLoopCount) {
@@ -380,7 +314,7 @@ public class GifStickerController extends SPStickerController implements Request
          * gif加载出错后回调
          * @param gifStickerController
          */
-        void onGifLoadError(GifStickerController gifStickerController);
+        void onGifLoadError(GifStickerController gifStickerController, String msg);
         /**
          * gif加载成功后回调
          * @param gifStickerController

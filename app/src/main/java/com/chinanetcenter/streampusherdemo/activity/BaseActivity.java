@@ -1,49 +1,40 @@
 package com.chinanetcenter.streampusherdemo.activity;
 
 import android.Manifest;
-import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.AlertDialog.Builder;
 import android.content.Context;
 import android.content.DialogInterface;
+import android.content.Intent;
 import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.os.Build;
 import android.os.Bundle;
-import android.support.annotation.Nullable;
-import android.support.v4.content.PermissionChecker;
 import android.util.Log;
-import android.view.KeyEvent;
 import android.view.Surface;
 import android.view.WindowManager;
 import android.widget.Toast;
+
+import com.chinanetcenter.streampusherdemo.permission.FloatWindowManager;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-public class BaseActivity extends Activity {
+import androidx.annotation.Nullable;
+import androidx.core.content.PermissionChecker;
+import androidx.fragment.app.FragmentActivity;
+import androidx.fragment.app.FragmentManager;
+
+public class BaseActivity extends FragmentActivity {
     private static final String TAG = "BaseActivity";
-    protected String[] PERMISSIONS = new String[] { Manifest.permission.WRITE_EXTERNAL_STORAGE, Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO, Manifest.permission.BLUETOOTH};
-    protected String[] PERMISSION_TOAST_STRING = new String[] { "存储", "相机", "麦克风", "蓝牙" };
-    
-    protected static long EXIT_INTERVAL = 2*1000;
+    protected String[] PERMISSIONS = new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE, Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO, Manifest.permission.BLUETOOTH};
+    protected String[] PERMISSION_TOAST_STRING = new String[]{"存储", "相机", "麦克风", "蓝牙"};
+    protected final int REQUEST_CODE_OVERLAY_PERMISSION = 1;
+
+    protected static long EXIT_INTERVAL = 2 * 1000;
     private long mBackKeyLastPressedTime;
-    
-    @Override
-    public boolean onKeyDown(int keyCode, KeyEvent event) {
-        if (keyCode == KeyEvent.KEYCODE_BACK) {
-            long currentTime = System.currentTimeMillis();
-            if (currentTime - mBackKeyLastPressedTime > EXIT_INTERVAL) {
-                Toast.makeText(this, "再按一次离开界面", Toast.LENGTH_SHORT).show();
-                mBackKeyLastPressedTime = currentTime;
-                return false;
-            }
-            return super.onKeyDown(keyCode, event);
-        }
-        return super.onKeyDown(keyCode, event);
-    }
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -56,6 +47,28 @@ public class BaseActivity extends Activity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
+    }
+
+    @Override
+    public void onBackPressed() {
+        FragmentManager fragmentManager = getSupportFragmentManager();
+        final boolean isStateSaved = fragmentManager.isStateSaved();
+        if (isStateSaved && Build.VERSION.SDK_INT <= Build.VERSION_CODES.N_MR1) {
+            // Older versions will throw an exception from the framework
+            // FragmentManager.popBackStackImmediate(), so we'll just
+            // return here. The Activity is likely already on its way out
+            // since the fragmentManager has already been saved.
+            return;
+        }
+        if (isStateSaved || !fragmentManager.popBackStackImmediate()) {
+            long currentTime = System.currentTimeMillis();
+            if (currentTime - mBackKeyLastPressedTime > EXIT_INTERVAL) {
+                Toast.makeText(this, "再按一次离开界面", Toast.LENGTH_SHORT).show();
+                mBackKeyLastPressedTime = currentTime;
+            } else {
+                super.onBackPressed();
+            }
+        }
     }
 
     protected boolean checkAndRequestPermission() {
@@ -83,6 +96,10 @@ public class BaseActivity extends Activity {
                 Log.i(TAG, "the platform versin below 23 M , cann't request permissions  !");
             }
             return false;
+        } else {
+            if (!checkOverlayPermission()) {
+                showOverlayPermissionDialog();
+            }
         }
         Log.i(TAG, "checkPermission success , All permission has granted !");
         return true;
@@ -111,6 +128,14 @@ public class BaseActivity extends Activity {
             }
         }
         showRequestPermissinDialog(lackedPermissions);
+        if (!checkOverlayPermission()) {
+            showOverlayPermissionDialog();
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
     }
 
     protected void showRequestPermissinDialog(List<String> mLackedPermissions) {
@@ -133,28 +158,25 @@ public class BaseActivity extends Activity {
 
             @Override
             public void onClick(DialogInterface dialog, int which) {
-                // do nothing
-
-                // Intent intent = new Intent();
-                // intent.setAction(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
-                // intent.setData(Uri.fromParts("package", getPackageName(),
-                // null));
-                // startActivity(intent);
 
             }
         });
         builder.setCancelable(false);
         builder.create().show();
     }
-    
+
+    protected void showOverlayPermissionDialog() {
+        FloatWindowManager.getInstance().applyPermission(this);
+    }
+
     protected void requestFullScreen() {
         Log.i(TAG, "addFlags FLAG_FULLSCREEN");
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
 //        getWindow().addFlags(WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN);
 //        getWindow().addFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS);
     }
-    
-    
+
+
     protected void showToast(final String text) {
         runOnUiThread(new Runnable() {
 
@@ -164,27 +186,30 @@ public class BaseActivity extends Activity {
             }
         });
     }
-    
+
     protected void lockScreenToCurrentOrientation() {
         int orientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT;
 
         WindowManager wm = (WindowManager) getSystemService(Context.WINDOW_SERVICE);
         switch (wm.getDefaultDisplay().getRotation()) {
-        case Surface.ROTATION_90:
-            orientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE;
-            break;
-        case Surface.ROTATION_180:
-            orientation = ActivityInfo.SCREEN_ORIENTATION_REVERSE_PORTRAIT;
-            break;
-        case Surface.ROTATION_270:
-            orientation = ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE;
-            break;
-        case Surface.ROTATION_0:
-        default:
-            orientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT;
-            break;
+            case Surface.ROTATION_90:
+                orientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE;
+                break;
+            case Surface.ROTATION_180:
+                orientation = ActivityInfo.SCREEN_ORIENTATION_REVERSE_PORTRAIT;
+                break;
+            case Surface.ROTATION_270:
+                orientation = ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE;
+                break;
+            case Surface.ROTATION_0:
+            default:
+                orientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT;
+                break;
         }
         setRequestedOrientation(orientation);
     }
 
+    public boolean checkOverlayPermission() {
+        return FloatWindowManager.getInstance().checkPermission(this);
+    }
 }
