@@ -132,6 +132,7 @@ public class ConfigActivity extends BaseActivity implements OnClickListener {
 
     private void refreshConfigPage() {
         SPConfig config = SPManager.getConfig();
+        config.setEncoderMode(SPConfig.ENCODER_MODE_SOFT);
         config.setVideoResolution(VideoResolution.VIDEO_RESOLUTION_720P, VideoRatio.RATIO_16_9);
         // url
         // if(!TextUtils.isEmpty(config.getRtmpUrl())){
@@ -325,7 +326,7 @@ public class ConfigActivity extends BaseActivity implements OnClickListener {
         mhasVideoCb = (CheckBox) findViewById(R.id.has_video);
         mhasAudioCb = (CheckBox) findViewById(R.id.has_audio);
         mCustomVideoSourceRg = (RadioGroup) findViewById(R.id.custom_video_source_rg);
-        mCustomVideoSourceRg.check(mCustomVideoSourceRg.getChildAt(0).getId());
+        mCustomVideoSourceRg.check(mCustomVideoSourceRg.getChildAt(2).getId());
         if(Build.VERSION.SDK_INT < Build.VERSION_CODES.JELLY_BEAN_MR2) {
             //SPManager.pushTextureFrame方法只支持EGL14上下文环境，并且4.3及以上版本
             mCustomVideoSourceRg.getChildAt(2).setVisibility(View.GONE);

@@ -31,8 +31,6 @@ import android.util.Log;
 import android.util.Size;
 import android.view.Surface;
 
-import com.faceunity.nama.utils.ThreadHelper;
-
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -324,109 +322,6 @@ public final class CameraUtils {
                 }
             }
         }
-    }
-
-    /**
-     * 点击屏幕时，设置测光和对焦
-     *
-     * @param camera
-     * @param rawX
-     * @param rawY
-     * @param viewWidth
-     * @param viewHeight
-     * @param cameraWidth
-     * @param cameraHeight
-     * @param areaSize
-     * @param cameraFacing
-     */
-    public static void handleFocusMetering(Camera camera, float rawX, float rawY, int viewWidth, int viewHeight,
-                                           int cameraWidth, int cameraHeight, int areaSize, int cameraFacing) {
-        if (camera == null) {
-            return;
-        }
-        try {
-            Camera.Parameters parameters = camera.getParameters();
-            Rect focusRect = calculateTapArea(rawX / viewWidth * cameraHeight, rawY / viewHeight * cameraWidth,
-                    cameraHeight, cameraWidth, areaSize, cameraFacing);
-            final String focusMode = parameters.getFocusMode();
-            List<Camera.Area> focusAreas = new ArrayList<>();
-            focusAreas.add(new Camera.Area(focusRect, 1000));
-            List<Camera.Area> meteringAreas = new ArrayList<>();
-            meteringAreas.add(new Camera.Area(new Rect(focusRect), 1000));
-            if (parameters.getMaxNumFocusAreas() > 0 &&
-                    (focusMode.equals(Camera.Parameters.FOCUS_MODE_AUTO) ||
-                            focusMode.equals(Camera.Parameters.FOCUS_MODE_MACRO) ||
-                            focusMode.equals(Camera.Parameters.FOCUS_MODE_CONTINUOUS_PICTURE) ||
-                            focusMode.equals(Camera.Parameters.FOCUS_MODE_CONTINUOUS_VIDEO))) {
-                parameters.setFocusMode(Camera.Parameters.FOCUS_MODE_AUTO);
-                parameters.setFocusAreas(focusAreas);
-                if (parameters.getMaxNumMeteringAreas() > 0) {
-                    parameters.setMeteringAreas(meteringAreas);
-                    if (DEBUG) {
-                        Log.d(TAG, "handleFocusMetering: setMeteringAreas 1 " + focusRect);
-                    }
-                }
-                camera.cancelAutoFocus();
-                setParameters(camera, parameters);
-                camera.autoFocus(new Camera.AutoFocusCallback() {
-                    @Override
-                    public void onAutoFocus(boolean success, final Camera camera) {
-                        if (DEBUG) {
-                            Log.d(TAG, "onAutoFocus success:" + success);
-                        }
-                        resetFocus(camera, focusMode);
-                    }
-                });
-            } else if (parameters.getMaxNumMeteringAreas() > 0) {
-                if (!parameters.getSupportedFocusModes().contains(Camera.Parameters.FOCUS_MODE_AUTO)) {
-                    Log.w(TAG, "handleFocusMetering: not support focus");
-//                    return; //cannot autoFocus
-                }
-                parameters.setMeteringAreas(meteringAreas);
-                if (DEBUG) {
-                    Log.d(TAG, "handleFocusMetering: setMeteringAreas 2 " + focusRect);
-                }
-                camera.cancelAutoFocus();
-                setParameters(camera, parameters);
-                camera.autoFocus(new Camera.AutoFocusCallback() {
-                    @Override
-                    public void onAutoFocus(boolean success, Camera camera) {
-                        if (DEBUG) {
-                            Log.d(TAG, "onAutoFocus success:" + success);
-                        }
-                        resetFocus(camera, focusMode);
-                    }
-                });
-            } else {
-                camera.autoFocus(null);
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "handleFocusMetering: ", e);
-        }
-    }
-
-    private static void resetFocus(final Camera camera, final String focusMode) {
-        ThreadHelper.getInstance().removeUiAllTasks();
-        ThreadHelper.getInstance().runOnUiPostDelayed(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    camera.cancelAutoFocus();
-                    Camera.Parameters parameter = camera.getParameters();
-                    parameter.setFocusMode(focusMode);
-                    if (DEBUG) {
-                        Log.d(TAG, "resetFocus focusMode:" + focusMode);
-                    }
-                    parameter.setFocusAreas(null);
-                    parameter.setMeteringAreas(null);
-                    setParameters(camera, parameter);
-                } catch (Exception e) {
-                    if (DEBUG) {
-                        Log.w(TAG, "resetFocus: ", e);
-                    }
-                }
-            }
-        }, FOCUS_TIME);
     }
 
     private static Rect calculateTapArea(float x, float y, int width, int height, int areaSize, int cameraFacing) {

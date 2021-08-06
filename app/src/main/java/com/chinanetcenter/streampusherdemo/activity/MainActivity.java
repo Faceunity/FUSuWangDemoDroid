@@ -59,6 +59,7 @@ import com.chinanetcenter.StreamPusher.utils.ALog;
 import com.chinanetcenter.streampusherdemo.MyApp;
 import com.chinanetcenter.streampusherdemo.R;
 import com.chinanetcenter.streampusherdemo.adapter.SettingsAdapter;
+import com.chinanetcenter.streampusherdemo.custom.render.CameraUtils;
 import com.chinanetcenter.streampusherdemo.filter.FaceUnityFilter;
 import com.chinanetcenter.streampusherdemo.object.Question;
 import com.chinanetcenter.streampusherdemo.object.QuestionGroup;
@@ -76,9 +77,14 @@ import com.chinanetcenter.streampusherdemo.utils.SettingsPanelViewUtil;
 import com.chinanetcenter.streampusherdemo.video.CustomTextureSource;
 import com.chinanetcenter.streampusherdemo.video.CustomYuvSource;
 import com.chinanetcenter.streampusherdemo.view.MusicPickDialog;
+import com.faceunity.core.enumeration.CameraFacingEnum;
+import com.faceunity.core.enumeration.FUAIProcessorEnum;
+import com.faceunity.core.enumeration.FUInputTextureEnum;
+import com.faceunity.core.enumeration.FUTransformMatrixEnum;
 import com.faceunity.nama.FURenderer;
+import com.faceunity.nama.data.FaceUnityDataFactory;
+import com.faceunity.nama.listener.FURendererListener;
 import com.faceunity.nama.ui.FaceUnityView;
-import com.faceunity.nama.utils.CameraUtils;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -147,7 +153,7 @@ public class MainActivity extends BaseActivity implements OnClickListener, OnIte
     private FURenderer mFURenderer;
     private SensorManager mSensorManager;
     private FaceUnityFilter filter;
-    private TextView tv_track_text;
+    private FaceUnityDataFactory mFaceUnityDataFactory;
 
     private List<SettingItem> mSettingItems = new ArrayList<SettingItem>() {
         {
@@ -539,56 +545,59 @@ public class MainActivity extends BaseActivity implements OnClickListener, OnIte
 
     }
 
+    private FURendererListener mFURendererListener = new FURendererListener() {
+
+        @Override
+        public void onPrepare() {
+            mFaceUnityDataFactory.bindCurrentRenderer();
+        }
+
+        @Override
+        public void onTrackStatusChanged(FUAIProcessorEnum type, int status) {
+            Log.e(TAG, "onTrackStatusChanged: 人脸数: " + status);
+        }
+
+        @Override
+        public void onFpsChanged(double fps, double callTime) {
+            final String FPS = String.format(Locale.getDefault(), "%.2f", fps);
+            Log.e(TAG, "onFpsChanged: FPS " + FPS + " callTime " + String.format(Locale.getDefault(), "%.2f", callTime));
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    mTvFps.setText(FPS);
+                }
+            });
+        }
+
+        @Override
+        public void onRelease() {
+        }
+    };
+
     private void initFilter() {
         String isOn = PreferenceUtil.getString(MyApp.getMyInstance(), PreferenceUtil.KEY_FACEUNITY_ISON);
-        tv_track_text = (TextView) findViewById(R.id.tv_track_text);
         FaceUnityView beautyControlView = findViewById(R.id.faceunity_control);
         if ("false".equals(isOn)) {
             beautyControlView.setVisibility(View.GONE);
             return;
         }
-        mFURenderer = new FURenderer
-                .Builder(this)
-                .setInputTextureType(FURenderer.INPUT_TEXTURE_2D)
-                .setCameraFacing(mCurrentCameraId)
-                .setCreateEglContext(true)
-                .setInputImageOrientation(CameraUtils.getCameraOrientation(mCurrentCameraId))
-                .setRunBenchmark(true)
-                .setOnDebugListener(new FURenderer.OnDebugListener() {
-                    @Override
-                    public void onFpsChanged(double fps, double callTime) {
-                        final String FPS = String.format(Locale.getDefault(), "%.2f", fps);
-                        Log.e(TAG, "onFpsChanged: FPS " + FPS + " callTime " + String.format(Locale.getDefault(), "%.2f", callTime));
-                        runOnUiThread(new Runnable() {
-                            @Override
-                            public void run() {
-                                if (mTvFps != null) {
-                                    mTvFps.setText("FPS: " + FPS);
-                                }
-                            }
-                        });
-                    }
-                })
-                .setOnTrackStatusChangedListener(new FURenderer.OnTrackStatusChangedListener() {
-                    @Override
-                    public void onTrackStatusChanged(final int type, final int status) {
-                        runOnUiThread(new Runnable() {
-                            @Override
-                            public void run() {
-                                tv_track_text.setText(type == FURenderer.TRACK_TYPE_FACE ? R.string.toast_not_detect_face : R.string.toast_not_detect_face_or_body);
-                                tv_track_text.setVisibility(status > 0 ? View.INVISIBLE : View.VISIBLE);
-                            }
-                        });
-                    }
-                })
-                .build();
-        beautyControlView.setModuleManager(mFURenderer);
+        mFURenderer = FURenderer.getInstance();
+        mFURenderer.setInputTextureType(FUInputTextureEnum.FU_ADM_FLAG_COMMON_TEXTURE);
+        mFURenderer.setCameraFacing(mCurrentCameraId == CameraInfo.CAMERA_FACING_FRONT ? CameraFacingEnum.CAMERA_FRONT : CameraFacingEnum.CAMERA_BACK);
+        mFURenderer.setInputOrientation(CameraUtils.getCameraOrientation(mCurrentCameraId));
+        mFURenderer.setCreateEGLContext(true);
+        mFURenderer.setMarkFPSEnable(true);
+        mFURenderer.setInputBufferMatrix(mCurrentCameraId == CameraInfo.CAMERA_FACING_FRONT ? FUTransformMatrixEnum.CCROT0 : FUTransformMatrixEnum.CCROT0_FLIPVERTICAL);
+        mFURenderer.setInputTextureMatrix(mCurrentCameraId == CameraInfo.CAMERA_FACING_FRONT ? FUTransformMatrixEnum.CCROT0 : FUTransformMatrixEnum.CCROT0_FLIPVERTICAL);
+        mFURenderer.setOutputMatrix(mCurrentCameraId == CameraInfo.CAMERA_FACING_FRONT ? FUTransformMatrixEnum.CCROT0_FLIPVERTICAL : FUTransformMatrixEnum.CCROT0);
+        mFURenderer.setWangsuCamera(true);
+        mFURenderer.setFURendererListener(mFURendererListener);
+
+
+        mFaceUnityDataFactory = new FaceUnityDataFactory(0);
+        beautyControlView.bindDataFactory(mFaceUnityDataFactory);
         filter = new FaceUnityFilter(this, mFURenderer);
         SPManager.setFilter(filter);
-
-        if (mFURenderer.getMakeupModule() != null) {
-            mFURenderer.getMakeupModule().setIsMakeupFlipPoints(mCurrentCameraId == 0 ? 0 : 1);
-        }
 
         mSensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
         Sensor sensor = mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
@@ -692,10 +701,12 @@ public class MainActivity extends BaseActivity implements OnClickListener, OnIte
                     setButtonEnabled(mFlashImageBtn, false);
 
                     if (mFURenderer != null) {
-                        mFURenderer.onCameraChanged(mCurrentCameraId, CameraUtils.getCameraOrientation(mCurrentCameraId));
-                        if (mFURenderer.getMakeupModule() != null) {
-                            mFURenderer.getMakeupModule().setIsMakeupFlipPoints(mCurrentCameraId == 0 ? 0 : 1);
-                        }
+                        mFURenderer.setCameraFacing(mCurrentCameraId == Camera.CameraInfo.CAMERA_FACING_FRONT ? CameraFacingEnum.CAMERA_FRONT : CameraFacingEnum.CAMERA_BACK);
+                        mFURenderer.setInputOrientation(CameraUtils.getCameraOrientation(mCurrentCameraId));
+
+                        mFURenderer.setInputBufferMatrix(mCurrentCameraId == CameraInfo.CAMERA_FACING_FRONT ? FUTransformMatrixEnum.CCROT0 : FUTransformMatrixEnum.CCROT0_FLIPVERTICAL);
+                        mFURenderer.setInputTextureMatrix(mCurrentCameraId == CameraInfo.CAMERA_FACING_FRONT ? FUTransformMatrixEnum.CCROT0 : FUTransformMatrixEnum.CCROT0_FLIPVERTICAL);
+                        mFURenderer.setOutputMatrix(mCurrentCameraId == CameraInfo.CAMERA_FACING_FRONT ? FUTransformMatrixEnum.CCROT0_FLIPVERTICAL : FUTransformMatrixEnum.CCROT0);
                     }
                 }
                 break;
@@ -1678,9 +1689,9 @@ public class MainActivity extends BaseActivity implements OnClickListener, OnIte
             float z = event.values[2];
             if (Math.abs(x) > 3 || Math.abs(y) > 3) {
                 if (Math.abs(x) > Math.abs(y)) {
-                    mFURenderer.onDeviceOrientationChanged(x > 0 ? 0 : 180);
+                    mFURenderer.setDeviceOrientation(x > 0 ? 0 : 180);
                 } else {
-                    mFURenderer.onDeviceOrientationChanged(y > 0 ? 90 : 270);
+                    mFURenderer.setDeviceOrientation(y > 0 ? 90 : 270);
                 }
             }
         }
