@@ -1,55 +1,65 @@
 FUQNRTCDemoDroid是集成了 FaceUnity 美颜贴纸功能和 **昆瑞-集成网宿推流** 的 Demo。
 
-本文是 FaceUnity SDK 快速对接云信即时通讯的导读说明，SDK 版本为 **7.2.0**。关于 SDK 的详细说明，请参看 **[FULiveDemoDroid](https://github.com/Faceunity/FULiveDemoDroid/)**。对接第三方 Demo 的 faceunity 模块
+SDK 版本为 **7.4.1.0**。关于 SDK 的详细说明，请参看 **[FULiveDemoDroid](https://github.com/Faceunity/FULiveDemoDroid/tree/master/doc)**。
 
 **在对接过程中，自定义视频源，并发送Texture是性能最佳方式，具体内容在 MainCustomActivity 与 CameraRenderer 中**
 
 --------
 
-## 集成方法
+## 快速集成方法
 
 ### 一、添加 SDK
 
-将 faceunity 模块添加到工程中，下面是对库文件的说明。
+### 1. build.gradle配置
 
-- assets/sticker 文件夹下 \*.bundle 是特效贴纸文件。
-- assets/makeup 文件夹下 \*.bundle 是美妆素材文件。
-- com/faceunity/nama/authpack.java 是鉴权证书文件，必须提供有效的证书才能运行 Demo，请联系技术支持获取。
-
-通过 Maven 依赖最新版 SDK：`implementation 'com.faceunity:nama:7.2.0'`，方便升级，推荐使用。
-
-其中，AAR 包含以下内容：
-
+#### 1.1 allprojects配置
+```java
+allprojects {
+    repositories {
+        ...
+        maven { url 'http://maven.faceunity.com/repository/maven-public/' }
+        ...
+  }
+}
 ```
-    +libs                                  
-      -nama.jar                        // JNI 接口
-    +assets
-      +graphic                         // 图形效果道具
-        -body_slim.bundle              // 美体道具
-        -controller.bundle             // Avatar 道具
-        -face_beautification.bundle    // 美颜道具
-        -face_makeup.bundle            // 美妆道具
-        -fuzzytoonfilter.bundle        // 动漫滤镜道具
-        -fxaa.bundle                   // 3D 绘制抗锯齿
-        -tongue.bundle                 // 舌头跟踪数据包
-      +model                           // 算法能力模型
-        -ai_face_processor.bundle      // 人脸识别AI能力模型，需要默认加载
-        -ai_face_processor_lite.bundle // 人脸识别AI能力模型，轻量版
-        -ai_hand_processor.bundle      // 手势识别AI能力模型
-        -ai_human_processor.bundle     // 人体点位AI能力模型
-    +jni                               // CNama fuai 库
-      +armeabi-v7a
-        -libCNamaSDK.so
-        -libfuai.so
-      +arm64-v8a
-        -libCNamaSDK.so
-        -libfuai.so
-      +x86
-        -libCNamaSDK.so
-        -libfuai.so
-      +x86_64
-        -libCNamaSDK.so
-        -libfuai.so
+
+#### 1.2 dependencies导入依赖
+```java
+dependencies {
+...
+implementation 'com.faceunity:core:7.4.1.0' // 实现代码
+implementation 'com.faceunity:model:7.4.1.0' // 道具以及AI bundle
+...
+}
+```
+
+##### 备注
+
+集成参考文档：FULiveDemoDroid 工程 doc目录
+
+### 2. 其他接入方式-底层库依赖
+
+```java
+dependencies {
+...
+implementation 'com.faceunity:nama:7.4.1.0' //底层库-标准版
+implementation 'com.faceunity:nama-lite:7.4.1.0' //底层库-lite版
+...
+}
+```
+
+如需指定应用的 so 架构，请修改 app 模块 build.gradle：
+
+```groovy
+android {
+    // ...
+    defaultConfig {
+        // ...
+        ndk {
+            abiFilters 'armeabi-v7a', 'arm64-v8a'
+        }
+    }
+}
 ```
 
 如需指定应用的 so 架构，请修改 app 模块 build.gradle：
@@ -96,7 +106,7 @@ android {
 
 #### 2.创建
 
-调用 `FURenderer` 类的  `onSurfaceCreated` 方法在 SDK 使用前加载必要的资源。
+调用 `FURenderer` 类的  `prepareRenderer` 方法在 SDK 使用前加载必要的资源。
 
 在 CameraRenderer 类 onResume 方法中执行。
 
@@ -126,19 +136,18 @@ public int onDrawFrame(byte[] nv21Byte, int texId, int cameraWidth, int cameraHe
 
 #### 4. 销毁
 
-调用 `FURenderer` 类的  `onSurfaceDestroyed` 方法在 SDK 结束前释放占用的资源。
+调用 `FURenderer` 类的  `release` 方法在 SDK 结束前释放占用的资源。
 
 在 CameraRenderer 类 onPause方法中执行。
 
 #### 5. 切换相机
 
-调用 `FURenderer` 类 的  `onCameraChanged` 方法，用于重新为 SDK 设置参数。
-
 在 MainCustomActivity 中 R.id.btn_switch 控件的点击事件中执行。
+切换相机之后需要重新设置sdk参数， 详见 MainCustomActivity  480~491行
 
 #### 6. 旋转手机
 
-调用 `FURenderer` 类 的  `onDeviceOrientationChanged` 方法，用于重新为 SDK 设置参数。
+调用 `FURenderer` 类 的  `setDeviceOrientation` 方法，用于重新为 SDK 设置参数。
 
 使用方法：MainCustomActivity 中可见
 
@@ -170,11 +179,11 @@ public void onSensorChanged(SensorEvent event) {
 
 ### 三、接口介绍
 
-- IFURenderer 是核心接口，提供了创建、销毁、处理等功能。使用时通过 FURenderer.Builder 创建合适的 FURenderer 实例即可。
-- IModuleManager 是模块管理接口，用于创建和销毁各个功能模块，FURenderer 是其实现类。
-- IFaceBeautyModule 是美颜模块的接口，用于调整美颜参数。使用时通过 FURenderer 拿到 FaceBeautyModule 实例，调用里面的接口方法即可。
-- IStickerModule 是贴纸模块的接口，用于加载贴纸效果。使用时通过 FURenderer 拿到 StickerModule 实例，调用里面的接口方法即可。
-- IMakeModule 是美妆模块的接口，用于加载美妆效果。使用时通过 FURenderer 拿到 MakeupModule 实例，调用里面的接口方法即可。
-- IBodySlimModule 是美体模块的接口，用于调整美体参数。使用时通过 FURenderer 拿到 BodySlimModule 实例，调用里面的接口方法即可。
+- IFURenderer 是核心接口，提供了创建、销毁、渲染等接口。
+- FaceUnityDataFactory 控制四个功能模块，用于功能模块的切换，初始化
+- FaceBeautyDataFactory 是美颜业务工厂，用于调整美颜参数。
+- PropDataFactory 是道具业务工厂，用于加载贴纸效果。
+- MakeupDataFactory 是美妆业务工厂，用于加载美妆效果。
+- BodyBeautyDataFactory 是美体业务工厂，用于调整美体参数。
 
 关于 SDK 的更多详细说明，请参看 **[FULiveDemoDroid](https://github.com/Faceunity/FULiveDemoDroid/)**。如有对接问题，请联系技术支持。

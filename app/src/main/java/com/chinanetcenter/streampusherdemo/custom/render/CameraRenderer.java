@@ -19,7 +19,6 @@ import com.chinanetcenter.streampusherdemo.R;
 import com.chinanetcenter.streampusherdemo.custom.gles.ProgramTexture2d;
 import com.chinanetcenter.streampusherdemo.custom.gles.ProgramTextureOES;
 import com.chinanetcenter.streampusherdemo.custom.gles.core.GlUtil;
-import com.faceunity.nama.IFURenderer;
 
 import java.util.Arrays;
 import java.util.concurrent.CountDownLatch;
@@ -64,10 +63,11 @@ public class CameraRenderer implements GLSurfaceView.Renderer, Camera.PreviewCal
     private ProgramTextureOES mProgramTextureOes;
     private Handler mBackgroundHandler;
 
-    public CameraRenderer(Activity activity, GLSurfaceView glSurfaceView, OnRendererStatusListener onRendererStatusListener) {
+    public CameraRenderer(Activity activity, int cameraFacing, GLSurfaceView glSurfaceView, OnRendererStatusListener onRendererStatusListener) {
         mActivity = activity;
         mGlSurfaceView = glSurfaceView;
         mOnRendererStatusListener = onRendererStatusListener;
+        mCameraFacing = cameraFacing;
     }
 
     public void onResume() {
@@ -174,7 +174,8 @@ public class CameraRenderer implements GLSurfaceView.Renderer, Camera.PreviewCal
             mFuTextureId = mOnRendererStatusListener.onDrawFrame(mNv21ByteCopy, mCameraTextureId,
                     mCameraWidth, mCameraHeight, mMvpMatrix, mTexMatrix, mSurfaceTexture.getTimestamp());
         }
-        SPManager.pushTextureFrame(mFuTextureId, mCameraFacing == IFURenderer.CAMERA_FACING_FRONT ? 270 : 90, System.nanoTime() / 1000);
+        SPManager.pushTextureFrame(mFuTextureId, mCameraFacing == Camera.CameraInfo.CAMERA_FACING_FRONT ? 270 : 90, mSurfaceTexture.getTimestamp());
+//        SPManager.pushTextureFrame(mFuTextureId, mCameraFacing == Camera.CameraInfo.CAMERA_FACING_FRONT ? 270 : 90, System.nanoTime() / 1000);
 
         GLES20.glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT | GLES20.GL_DEPTH_BUFFER_BIT);

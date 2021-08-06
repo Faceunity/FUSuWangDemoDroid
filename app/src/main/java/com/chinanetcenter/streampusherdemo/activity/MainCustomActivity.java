@@ -14,6 +14,7 @@ import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.graphics.Color;
 import android.graphics.ImageFormat;
+import android.hardware.Camera;
 import android.hardware.Camera.CameraInfo;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
@@ -59,6 +60,7 @@ import com.chinanetcenter.streampusherdemo.R;
 import com.chinanetcenter.streampusherdemo.adapter.SettingsAdapter;
 import com.chinanetcenter.streampusherdemo.custom.gles.core.GlUtil;
 import com.chinanetcenter.streampusherdemo.custom.render.CameraRenderer;
+import com.chinanetcenter.streampusherdemo.custom.render.CameraUtils;
 import com.chinanetcenter.streampusherdemo.faceunity.profile.CSVUtils;
 import com.chinanetcenter.streampusherdemo.faceunity.profile.Constant;
 import com.chinanetcenter.streampusherdemo.object.Question;
@@ -74,9 +76,14 @@ import com.chinanetcenter.streampusherdemo.utils.DialogUtils.InputConfigClickLis
 import com.chinanetcenter.streampusherdemo.utils.PreferenceUtil;
 import com.chinanetcenter.streampusherdemo.utils.SettingsPanelViewUtil;
 import com.chinanetcenter.streampusherdemo.view.MusicPickDialog;
+import com.faceunity.core.enumeration.CameraFacingEnum;
+import com.faceunity.core.enumeration.FUAIProcessorEnum;
+import com.faceunity.core.enumeration.FUInputTextureEnum;
+import com.faceunity.core.enumeration.FUTransformMatrixEnum;
 import com.faceunity.nama.FURenderer;
+import com.faceunity.nama.data.FaceUnityDataFactory;
+import com.faceunity.nama.listener.FURendererListener;
 import com.faceunity.nama.ui.FaceUnityView;
-import com.faceunity.nama.utils.CameraUtils;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -149,6 +156,7 @@ public class MainCustomActivity extends BaseActivity implements OnClickListener,
     private SensorManager mSensorManager;
     private TextView tv_track_text;
     private CameraRenderer mCameraRenderer;
+    private FaceUnityDataFactory mFaceUnityDataFactory;
     private CSVUtils mCSVUtils;
 
     private List<SettingItem> mSettingItems = new ArrayList<SettingItem>() {
@@ -187,9 +195,9 @@ public class MainCustomActivity extends BaseActivity implements OnClickListener,
 
         initFilter();
         initHandle();
-        initLayout();
         // init
         initFromIntent();
+        initLayout();
         initLayoutState();
         bindFloatWindowService();
         checkAndRequestPermission();
@@ -420,13 +428,12 @@ public class MainCustomActivity extends BaseActivity implements OnClickListener,
         mPreviewView = findViewById(R.id.preview);
 
         mPreviewView.setEGLContextClientVersion(2);
-        mCameraRenderer = new CameraRenderer(this, mPreviewView, new CameraRenderer.OnRendererStatusListener() {
+        mCameraRenderer = new CameraRenderer(this, mCurrentCameraId, mPreviewView, new CameraRenderer.OnRendererStatusListener() {
 
             @Override
             public void onSurfaceCreated() {
-
                 if (mFURenderer != null) {
-                    mFURenderer.onSurfaceCreated();
+                    mFURenderer.prepareRenderer();
                 }
                 initCsvUtil(MainCustomActivity.this);
             }
@@ -436,19 +443,19 @@ public class MainCustomActivity extends BaseActivity implements OnClickListener,
 
             }
 
-            private byte[] mReadBack;
-
             @Override
             public int onDrawFrame(byte[] nv21Byte, int texId, int cameraWidth, int cameraHeight, float[] mvpMatrix, float[] texMatrix, long timeStamp) {
                 if (nv21Byte == null) {
                     return 0;
                 }
-                if (mReadBack == null) {
-                    mReadBack = new byte[nv21Byte.length];
-                }
                 if (mFURenderer != null) {
                     long start = System.nanoTime();
-                    final int texture = mFURenderer.onDrawFrameDualInput(nv21Byte, texId, cameraWidth, cameraHeight);
+                    int texture = 0;
+                    if (mFaceUnityDataFactory.isMakeupSelected()) {
+                        texture = mFURenderer.onDrawFrameSingleInput(texId, cameraWidth, cameraHeight);
+                    }else {
+                        texture = mFURenderer.onDrawFrameDualInput(nv21Byte, texId, cameraWidth, cameraHeight);
+                    }
                     long time = System.nanoTime() - start;
                     if (mCSVUtils != null) {
                         mCSVUtils.writeCsv(null, time);
@@ -461,7 +468,7 @@ public class MainCustomActivity extends BaseActivity implements OnClickListener,
             @Override
             public void onSurfaceDestroy() {
                 if (mFURenderer != null) {
-                    mFURenderer.onSurfaceDestroyed();
+                    mFURenderer.release();
                 }
 
                 if (mCSVUtils != null) {
@@ -471,8 +478,15 @@ public class MainCustomActivity extends BaseActivity implements OnClickListener,
 
             @Override
             public void onCameraChanged(int cameraFacing, int cameraOrientation) {
-                if (mFURenderer.getMakeupModule() != null) {
-                    mFURenderer.getMakeupModule().setIsMakeupFlipPoints(mCurrentCameraId == 0 ? 1 : 0);
+                mCurrentCameraId = cameraFacing;
+                if (mFURenderer != null) {
+                    mFURenderer.setCameraFacing(cameraFacing == Camera.CameraInfo.CAMERA_FACING_FRONT ? CameraFacingEnum.CAMERA_FRONT : CameraFacingEnum.CAMERA_BACK);
+                    mFURenderer.setInputOrientation(CameraUtils.getCameraOrientation(cameraFacing));
+
+                    mFURenderer.setInputBufferMatrix(mCurrentCameraId == CameraInfo.CAMERA_FACING_FRONT ? FUTransformMatrixEnum.CCROT0_FLIPVERTICAL : FUTransformMatrixEnum.CCROT0);
+                    mFURenderer.setInputTextureMatrix(mCurrentCameraId == CameraInfo.CAMERA_FACING_FRONT ? FUTransformMatrixEnum.CCROT0_FLIPVERTICAL : FUTransformMatrixEnum.CCROT0);
+                    mFURenderer.setOutputMatrix(mCurrentCameraId == CameraInfo.CAMERA_FACING_FRONT ? FUTransformMatrixEnum.CCROT0 : FUTransformMatrixEnum.CCROT0_FLIPVERTICAL);
+
                 }
             }
         });
@@ -512,7 +526,7 @@ public class MainCustomActivity extends BaseActivity implements OnClickListener,
         String filePath = Constant.filePath + dateStrDir + File.separator + "excel-" + dateStrFile + ".csv";
         Log.d(TAG, "initLog: CSV file path:" + filePath);
         StringBuilder headerInfo = new StringBuilder();
-        headerInfo.append("version：").append(FURenderer.getVersion()).append(CSVUtils.COMMA)
+        headerInfo.append("version：").append(FURenderer.getInstance().getVersion()).append(CSVUtils.COMMA)
                 .append("机型：").append(android.os.Build.MANUFACTURER).append(android.os.Build.MODEL)
                 .append("处理方式：双输入返回Texture").append(CSVUtils.COMMA);
         mCSVUtils.initHeader(filePath, headerInfo);
@@ -546,36 +560,66 @@ public class MainCustomActivity extends BaseActivity implements OnClickListener,
 
     }
 
+    private FURendererListener mFURendererListener = new FURendererListener() {
+
+        @Override
+        public void onPrepare() {
+            mFaceUnityDataFactory.bindCurrentRenderer();
+        }
+
+        @Override
+        public void onTrackStatusChanged(FUAIProcessorEnum type, int status) {
+            Log.e(TAG, "onTrackStatusChanged: 人脸数: " + status);
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    tv_track_text.setVisibility(status > 0 ? View.GONE : View.VISIBLE);
+                    if (type == FUAIProcessorEnum.FACE_PROCESSOR) {
+                        tv_track_text.setText(R.string.toast_not_detect_face);
+                    }else if (type == FUAIProcessorEnum.HUMAN_PROCESSOR) {
+                        tv_track_text.setText(R.string.toast_not_detect_body);
+                    }
+                }
+            });
+        }
+
+        @Override
+        public void onFpsChanged(double fps, double callTime) {
+            final String FPS = String.format(Locale.getDefault(), "%.2f", fps);
+            Log.e(TAG, "onFpsChanged: FPS " + FPS + " callTime " + String.format(Locale.getDefault(), "%.2f", callTime));
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    mTvFps.setText(FPS);
+                }
+            });
+        }
+
+        @Override
+        public void onRelease() {
+        }
+    };
+
     private void initFilter() {
         tv_track_text = (TextView) findViewById(R.id.tv_track_text);
         FaceUnityView beautyControlView = findViewById(R.id.faceunity_control);
-        mFURenderer = new FURenderer.Builder(this)
-                .setCreateEglContext(true)
-                .setInputTextureType(FURenderer.INPUT_TEXTURE_EXTERNAL_OES)
-                .setCameraFacing(FURenderer.CAMERA_FACING_FRONT)
-                .setInputImageOrientation(CameraUtils.getCameraOrientation(FURenderer.CAMERA_FACING_FRONT))
-                .setRunBenchmark(true)
-                .setOnDebugListener(new FURenderer.OnDebugListener() {
-                    @Override
-                    public void onFpsChanged(final double fps, final double callTime) {
-                        Log.d(TAG, "onFpsChanged() called with: fps = [" + (int) fps + "], callTime = [" + String.format("%.2f", (float) callTime) + "]");
-                        runOnUiThread(new Runnable() {
-                            @Override
-                            public void run() {
-                                if (mTvFps != null) {
-                                    mTvFps.setText("FPS: " + (int) fps + " callTime " + String.format("%.2f", (float) callTime));
-                                }
-                            }
-                        });
-                    }
-                })
-                .build();
-        Log.e(TAG, "initFilter: mFURenderer " + mFURenderer);
-        beautyControlView.setModuleManager(mFURenderer);
+        mFURenderer = FURenderer.getInstance();
+        mFURenderer.setInputTextureType(FUInputTextureEnum.FU_ADM_FLAG_EXTERNAL_OES_TEXTURE);
+        mFURenderer.setCameraFacing(mCurrentCameraId == CameraInfo.CAMERA_FACING_FRONT ? CameraFacingEnum.CAMERA_FRONT : CameraFacingEnum.CAMERA_BACK);
+        mFURenderer.setInputOrientation(CameraUtils.getCameraOrientation(mCurrentCameraId));
+        mFURenderer.setCreateEGLContext(true);
+        mFURenderer.setMarkFPSEnable(true);
 
-        if (mFURenderer.getMakeupModule() != null) {
-            mFURenderer.getMakeupModule().setIsMakeupFlipPoints(mCurrentCameraId == 0 ? 1 : 0);
-        }
+        mFURenderer.setInputBufferMatrix(mCurrentCameraId == CameraInfo.CAMERA_FACING_FRONT ? FUTransformMatrixEnum.CCROT0_FLIPVERTICAL : FUTransformMatrixEnum.CCROT0);
+        mFURenderer.setInputTextureMatrix(mCurrentCameraId == CameraInfo.CAMERA_FACING_FRONT ? FUTransformMatrixEnum.CCROT0_FLIPVERTICAL : FUTransformMatrixEnum.CCROT0);
+        mFURenderer.setOutputMatrix(mCurrentCameraId == CameraInfo.CAMERA_FACING_FRONT ? FUTransformMatrixEnum.CCROT0 : FUTransformMatrixEnum.CCROT0_FLIPVERTICAL);
+
+        mFURenderer.setWangsuCamera(false);
+        mFURenderer.setFURendererListener(mFURendererListener);
+
+        Log.e(TAG, "initFilter: mFURenderer " + mFURenderer);
+        mFaceUnityDataFactory = new FaceUnityDataFactory(0);
+        beautyControlView.bindDataFactory(mFaceUnityDataFactory);
 
         mSensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
         Sensor sensor = mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
@@ -681,18 +725,6 @@ public class MainCustomActivity extends BaseActivity implements OnClickListener,
             case R.id.btn_switch:
                 if (mCameraRenderer != null) {
                     mCameraRenderer.switchCamera();
-                }
-                if (SPManager.switchCamera()) {
-                    mCurrentCameraId = mCurrentCameraId == 0 ? 1 : 0;
-                    mFlashImageBtn.setSelected(false);
-                    setButtonEnabled(mFlashImageBtn, false);
-
-                    if (mFURenderer != null) {
-                        mFURenderer.onCameraChanged(mCurrentCameraId, CameraUtils.getCameraOrientation(mCurrentCameraId));
-                        if (mFURenderer.getMakeupModule() != null) {
-                            mFURenderer.getMakeupModule().setIsMakeupFlipPoints(mCurrentCameraId == 0 ? 0 : 1);
-                        }
-                    }
                 }
                 break;
             case R.id.btn_flash:
@@ -1665,9 +1697,9 @@ public class MainCustomActivity extends BaseActivity implements OnClickListener,
             float z = event.values[2];
             if (Math.abs(x) > 3 || Math.abs(y) > 3) {
                 if (Math.abs(x) > Math.abs(y)) {
-                    mFURenderer.onDeviceOrientationChanged(x > 0 ? 0 : 180);
+                    mFURenderer.setDeviceOrientation(x > 0 ? 0 : 180);
                 } else {
-                    mFURenderer.onDeviceOrientationChanged(y > 0 ? 90 : 270);
+                    mFURenderer.setDeviceOrientation(y > 0 ? 90 : 270);
                 }
             }
         }

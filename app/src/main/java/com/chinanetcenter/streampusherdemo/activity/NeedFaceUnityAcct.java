@@ -5,12 +5,16 @@ import android.os.Bundle;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 
 import com.chinanetcenter.streampusherdemo.MyApp;
 import com.chinanetcenter.streampusherdemo.R;
 import com.chinanetcenter.streampusherdemo.utils.PreferenceUtil;
+
+import java.io.IOException;
+import java.io.InputStream;
 
 public class NeedFaceUnityAcct extends AppCompatActivity {
 
@@ -49,6 +53,13 @@ public class NeedFaceUnityAcct extends AppCompatActivity {
                 finish();
             }
         });
+
+        try {
+            InputStream ins = getAssets().open("makeup/naicha.bundle");
+            Log.e("benyq", "onCreate: ins " + ins.available());
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
 
     }
 }

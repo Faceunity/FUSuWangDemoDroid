@@ -25,13 +25,14 @@ public class MyApp extends Application {
 
         ErrorHandler.getInstance().attach(this);
         // refWatcher = LeakCanary.install(this);
-        FURenderer.setup(this);
+        FURenderer.getInstance().setup(this);
     }
 
     public static MyApp getMyInstance() {
         return myApp;
     }
 
+    @Override
     public void onTerminate() {
         super.onTerminate();
         ErrorHandler.getInstance().dettach(this);

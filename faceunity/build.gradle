@@ -13,6 +13,10 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
+    compileOptions {
+        targetCompatibility JavaVersion.VERSION_1_8
+        sourceCompatibility JavaVersion.VERSION_1_8
+    }
 }
 
 dependencies {
@@ -20,5 +24,10 @@ dependencies {
     implementation 'androidx.appcompat:appcompat:1.0.0'
     implementation 'androidx.recyclerview:recyclerview:1.0.0'
     implementation 'androidx.constraintlayout:constraintlayout:1.1.3'
-    implementation 'com.faceunity:nama:7.2.0'
+    configurations.all {
+        resolutionStrategy.cacheChangingModulesFor 0,'seconds'
+        resolutionStrategy.cacheDynamicVersionsFor 0,'seconds'
+    }
+    api 'com.faceunity:core:7.4.1.0'
+    implementation 'com.faceunity:model:7.4.1.0'
 }
