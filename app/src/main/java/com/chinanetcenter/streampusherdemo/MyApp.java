@@ -3,7 +3,9 @@ package com.chinanetcenter.streampusherdemo;
 import android.app.Application;
 
 import com.chinanetcenter.StreamPusher.utils.ErrorHandler;
+import com.faceunity.FUConfig;
 import com.faceunity.nama.FURenderer;
+import com.faceunity.nama.utils.FuDeviceUtils;
 
 //import com.squareup.leakcanary.LeakCanary;
 //import com.squareup.leakcanary.watcher.RefWatcher;
@@ -22,7 +24,7 @@ public class MyApp extends Application {
     public void onCreate() {
         super.onCreate();
         myApp = this;
-
+        FUConfig.DEVICE_LEVEL = FuDeviceUtils.judgeDeviceLevel(this);
         ErrorHandler.getInstance().attach(this);
         // refWatcher = LeakCanary.install(this);
         FURenderer.getInstance().setup(this);

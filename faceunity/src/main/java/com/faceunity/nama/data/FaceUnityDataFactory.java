@@ -22,22 +22,6 @@ public class FaceUnityDataFactory {
     private FURenderKit mFURenderKit = FURenderKit.getInstance();
     private FURenderer mFURenderer = FURenderer.getInstance();
 
-    private static FaceUnityDataFactory sInstance;
-    public static FaceUnityDataFactory getInstance() {
-        if (sInstance == null) {
-            synchronized (FaceUnityDataFactory.class) {
-                if (sInstance == null) {
-                    sInstance = new FaceUnityDataFactory(0);
-                }
-            }
-        }
-        return sInstance;
-    }
-
-    public static void release() {
-        sInstance = null;
-    }
-
     /**
      * 道具加载标识
      */
