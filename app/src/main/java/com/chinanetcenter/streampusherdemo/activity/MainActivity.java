@@ -594,7 +594,7 @@ public class MainActivity extends BaseActivity implements OnClickListener, OnIte
         mFURenderer.setFURendererListener(mFURendererListener);
 
 
-        mFaceUnityDataFactory = new FaceUnityDataFactory(0);
+        mFaceUnityDataFactory = new FaceUnityDataFactory(-1);
         beautyControlView.bindDataFactory(mFaceUnityDataFactory);
         filter = new FaceUnityFilter(this, mFURenderer);
         SPManager.setFilter(filter);

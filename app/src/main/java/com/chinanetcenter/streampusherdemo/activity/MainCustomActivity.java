@@ -80,10 +80,15 @@ import com.faceunity.core.enumeration.CameraFacingEnum;
 import com.faceunity.core.enumeration.FUAIProcessorEnum;
 import com.faceunity.core.enumeration.FUInputTextureEnum;
 import com.faceunity.core.enumeration.FUTransformMatrixEnum;
+import com.faceunity.core.faceunity.FUAIKit;
+import com.faceunity.core.faceunity.FURenderKit;
+import com.faceunity.core.model.facebeauty.FaceBeautyBlurTypeEnum;
+import com.faceunity.nama.FUConfig;
 import com.faceunity.nama.FURenderer;
 import com.faceunity.nama.data.FaceUnityDataFactory;
 import com.faceunity.nama.listener.FURendererListener;
 import com.faceunity.nama.ui.FaceUnityView;
+import com.faceunity.nama.utils.FuDeviceUtils;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -430,6 +435,23 @@ public class MainCustomActivity extends BaseActivity implements OnClickListener,
         mPreviewView.setEGLContextClientVersion(2);
         mCameraRenderer = new CameraRenderer(this, mCurrentCameraId, mPreviewView, new CameraRenderer.OnRendererStatusListener() {
 
+            private void cheekFaceNum() {
+                //根据有无人脸 + 设备性能 判断开启的磨皮类型
+                float faceProcessorGetConfidenceScore = FUAIKit.getInstance().getFaceProcessorGetConfidenceScore(0);
+                if (faceProcessorGetConfidenceScore >= 0.95) {
+                    //高端手机并且检测到人脸开启均匀磨皮，人脸点位质
+                    if (FURenderKit.getInstance().getFaceBeauty() != null && FURenderKit.getInstance().getFaceBeauty().getBlurType() != FaceBeautyBlurTypeEnum.EquallySkin) {
+                        FURenderKit.getInstance().getFaceBeauty().setBlurType(FaceBeautyBlurTypeEnum.EquallySkin);
+                        FURenderKit.getInstance().getFaceBeauty().setEnableBlurUseMask(true);
+                    }
+                } else {
+                    if (FURenderKit.getInstance().getFaceBeauty() != null && FURenderKit.getInstance().getFaceBeauty().getBlurType() != FaceBeautyBlurTypeEnum.FineSkin) {
+                        FURenderKit.getInstance().getFaceBeauty().setBlurType(FaceBeautyBlurTypeEnum.FineSkin);
+                        FURenderKit.getInstance().getFaceBeauty().setEnableBlurUseMask(false);
+                    }
+                }
+            }
+
             @Override
             public void onSurfaceCreated() {
                 if (mFURenderer != null) {
@@ -449,6 +471,11 @@ public class MainCustomActivity extends BaseActivity implements OnClickListener,
                     return 0;
                 }
                 if (mFURenderer != null) {
+
+                    if (FUConfig.DEVICE_LEVEL > FuDeviceUtils.DEVICE_LEVEL_MID) {
+                        cheekFaceNum();
+                    }
+
                     long start = System.nanoTime();
                     int texture = 0;
                     if (mFaceUnityDataFactory.isMakeupSelected()) {
@@ -618,7 +645,7 @@ public class MainCustomActivity extends BaseActivity implements OnClickListener,
         mFURenderer.setFURendererListener(mFURendererListener);
 
         Log.e(TAG, "initFilter: mFURenderer " + mFURenderer);
-        mFaceUnityDataFactory = new FaceUnityDataFactory(0);
+        mFaceUnityDataFactory = new FaceUnityDataFactory(-1);
         beautyControlView.bindDataFactory(mFaceUnityDataFactory);
 
         mSensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);

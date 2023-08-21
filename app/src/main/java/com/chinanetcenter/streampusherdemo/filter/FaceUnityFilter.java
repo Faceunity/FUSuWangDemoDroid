@@ -7,7 +7,12 @@ import android.util.Log;
 import com.chinanetcenter.StreamPusher.sdk.SPVideoFilter;
 import com.chinanetcenter.streampusherdemo.faceunity.profile.CSVUtils;
 import com.chinanetcenter.streampusherdemo.faceunity.profile.Constant;
+import com.faceunity.core.faceunity.FUAIKit;
+import com.faceunity.core.faceunity.FURenderKit;
+import com.faceunity.core.model.facebeauty.FaceBeautyBlurTypeEnum;
+import com.faceunity.nama.FUConfig;
 import com.faceunity.nama.FURenderer;
+import com.faceunity.nama.utils.FuDeviceUtils;
 
 import java.io.File;
 import java.nio.FloatBuffer;
@@ -54,6 +59,11 @@ public class FaceUnityFilter extends SPVideoFilter {
     @Override
     public int onDrawFrame(int texId, FloatBuffer floatBuffer, FloatBuffer floatBuffer1) {
         Log.v(TAG, "onDrawFrame() called with: texId = [" + texId + "], thread:" + Thread.currentThread().getName() + ", egl:" + EGL14.eglGetCurrentContext());
+
+        if (FUConfig.DEVICE_LEVEL > FuDeviceUtils.DEVICE_LEVEL_MID) {
+            cheekFaceNum();
+        }
+
         long start = System.nanoTime();
         int fuTexId = mFURenderer.onDrawFrameDualInput(null, texId, mWidth, mHeight);
         long time = System.nanoTime() - start;
@@ -83,6 +93,23 @@ public class FaceUnityFilter extends SPVideoFilter {
                 .append("机型：").append(android.os.Build.MANUFACTURER).append(android.os.Build.MODEL)
                 .append("处理方式：Texture").append(CSVUtils.COMMA);
         mCSVUtils.initHeader(filePath, headerInfo);
+    }
+
+    private void cheekFaceNum() {
+        //根据有无人脸 + 设备性能 判断开启的磨皮类型
+        float faceProcessorGetConfidenceScore = FUAIKit.getInstance().getFaceProcessorGetConfidenceScore(0);
+        if (faceProcessorGetConfidenceScore >= 0.95) {
+            //高端手机并且检测到人脸开启均匀磨皮，人脸点位质
+            if (FURenderKit.getInstance().getFaceBeauty() != null && FURenderKit.getInstance().getFaceBeauty().getBlurType() != FaceBeautyBlurTypeEnum.EquallySkin) {
+                FURenderKit.getInstance().getFaceBeauty().setBlurType(FaceBeautyBlurTypeEnum.EquallySkin);
+                FURenderKit.getInstance().getFaceBeauty().setEnableBlurUseMask(true);
+            }
+        } else {
+            if (FURenderKit.getInstance().getFaceBeauty() != null && FURenderKit.getInstance().getFaceBeauty().getBlurType() != FaceBeautyBlurTypeEnum.FineSkin) {
+                FURenderKit.getInstance().getFaceBeauty().setBlurType(FaceBeautyBlurTypeEnum.FineSkin);
+                FURenderKit.getInstance().getFaceBeauty().setEnableBlurUseMask(false);
+            }
+        }
     }
 
 }
